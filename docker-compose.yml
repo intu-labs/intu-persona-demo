@@ -1,0 +1,91 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+minio:
+  image: minio/minio:latest
+  container_name: minio
+  restart: unless-stopped
+  environment:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin
+  command: server /data --console-address ":9001"
+  ports:
+    - "9000:9000"
+    - "9001:9001"
+  volumes:
+    - minio_data:/data
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+    interval: 30s
+    timeout: 20s
+    retries: 3
+
+ollama:
+  image: ollama/ollama:latest
+  container_name: ollama
+  restart: unless-stopped
+  ports:
+    - "11434:11434"
+  volumes:
+    - ollama_data:/root/.ollama
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+comfyui:
+  build:
+    context: .
+    dockerfile: ./mcp-server/src/services/imageGen/Dockerfile
+  container_name: comfyui
+  restart: unless-stopped
+  runtime: nvidia
+  ports:
+    - "8188:8188"
+  volumes:
+    # Mount models from mcp-server (proper production location) - read-only for safety
+    - ./mcp-server/src/services/imageGen/models/diffusion_models:/home/comfyui/ComfyUI/models/diffusion_models:ro
+    - ./comfyui-custom/loras:/home/comfyui/ComfyUI/models/loras:ro
+    - ./comfyui-custom/t5xxl_fp16.safetensors:/home/comfyui/ComfyUI/models/text_encoders/t5xxl_fp16.safetensors:ro
+    - ./comfyui-custom/clip_l.safetensors:/home/comfyui/ComfyUI/models/text_encoders/clip_l.safetensors:ro
+    - ./comfyui-custom/ae.safetensors:/home/comfyui/ComfyUI/models/vae/ae.safetensors:ro
+    # Data directories for input/output (read-write)
+    - comfyui_input:/home/comfyui/data/input
+    - comfyui_output:/home/comfyui/data/output
+  environment:
+    - NVIDIA_VISIBLE_DEVICES=all
+    - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+  # Simplified GPU configuration for better compatibility
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+  healthcheck:
+    test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+volumes:
+  mongo_data:
+  minio_data:
+  ollama_data:
+  comfyui_input:
+  comfyui_output:

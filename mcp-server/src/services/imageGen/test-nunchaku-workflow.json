@@ -1,0 +1,102 @@
+{
+  "input": {
+    "workflow": {
+      "1": {
+        "inputs": {
+          "model_name": "flux1-dev.safetensors"
+        },
+        "class_type": "NunchakuFluxDiTLoader",
+        "_meta": {
+          "title": "Nunchaku FLUX Model Loader"
+        }
+      },
+      "2": {
+        "inputs": {
+          "text_encoder_name": "t5xxl_fp16.safetensors"
+        },
+        "class_type": "NunchakuTextEncoderLoader",
+        "_meta": {
+          "title": "Nunchaku Text Encoder"
+        }
+      },
+      "3": {
+        "inputs": {
+          "text": "a beautiful landscape with mountains and a lake",
+          "clip": ["2", 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Positive)"
+        }
+      },
+      "4": {
+        "inputs": {
+          "text": "",
+          "clip": ["2", 0]
+        },
+        "class_type": "CLIPTextEncode",
+        "_meta": {
+          "title": "CLIP Text Encode (Negative)"
+        }
+      },
+      "5": {
+        "inputs": {
+          "width": 1024,
+          "height": 1024,
+          "batch_size": 1
+        },
+        "class_type": "EmptyLatentImage",
+        "_meta": {
+          "title": "Empty Latent Image"
+        }
+      },
+      "6": {
+        "inputs": {
+          "seed": 42,
+          "steps": 20,
+          "cfg": 7.0,
+          "sampler_name": "euler",
+          "scheduler": "normal",
+          "denoise": 1.0,
+          "model": ["1", 0],
+          "positive": ["3", 0],
+          "negative": ["4", 0],
+          "latent_image": ["5", 0]
+        },
+        "class_type": "KSampler",
+        "_meta": {
+          "title": "KSampler"
+        }
+      },
+      "7": {
+        "inputs": {
+          "vae_name": "ae.safetensors"
+        },
+        "class_type": "VAELoader",
+        "_meta": {
+          "title": "VAE Loader"
+        }
+      },
+      "8": {
+        "inputs": {
+          "samples": ["6", 0],
+          "vae": ["7", 0]
+        },
+        "class_type": "VAEDecode",
+        "_meta": {
+          "title": "VAE Decode"
+        }
+      },
+      "9": {
+        "inputs": {
+          "filename_prefix": "nunchaku_test",
+          "images": ["8", 0]
+        },
+        "class_type": "SaveImage",
+        "_meta": {
+          "title": "Save Image"
+        }
+      }
+    }
+  }
+} 

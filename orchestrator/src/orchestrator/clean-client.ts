@@ -1,0 +1,557 @@
+/**
+ * Clean MCP Client Implementation for Orchestrator
+ *
+ * A minimal, protocol-compliant implementation following the MCP specification
+ * with proper session management and error handling.
+ */
+
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import {
+  LoggingMessageNotificationSchema,
+  ToolListChangedNotificationSchema,
+  ResourceListChangedNotificationSchema,
+  PromptListChangedNotificationSchema,
+} from "@modelcontextprotocol/sdk/types.js";
+import dotenv from "dotenv";
+import { logger } from "../utils/logger.js";
+
+// Load environment variables
+dotenv.config();
+
+// Type definitions for better TypeScript support
+export type McpResource = {
+  uri?: string;
+  name?: string;
+  id?: string;
+  [key: string]: any;
+};
+
+export type McpTool = {
+  name?: string;
+  id?: string;
+  inputSchema?: any;
+  [key: string]: any;
+};
+
+export type McpPrompt = {
+  name?: string;
+  arguments?: any[];
+  [key: string]: any;
+};
+
+// Response types that match the SDK's actual return types
+export type ResourceResponse = {
+  resources: McpResource[];
+  [key: string]: any;
+};
+
+export type ToolResponse = {
+  tools: McpTool[];
+  [key: string]: any;
+};
+
+export type PromptResponse = {
+  prompts: McpPrompt[];
+  [key: string]: any;
+};
+
+export type ServerVersionInfo = {
+  name?: string;
+  version?: string;
+  [key: string]: any;
+};
+
+// Singleton state
+let client: Client<any, any, any> | null = null;
+let transport: StreamableHTTPClientTransport | null = null;
+let connectionPromise: Promise<Client<any, any, any>> | null = null;
+let isConnecting = false;
+let lastConnectionTime = 0;
+const RECONNECT_INTERVAL = 30000; // 30 seconds
+
+// Configuration with environment variable fallback
+const MCP_SERVER_URL =
+  process.env.MCP_SERVER_URL || "http://127.0.0.1:3000/mcp";
+
+/**
+ * Simple logger with prefix for MCP operations
+ */
+function log(category: string, message: string, ...args: any[]): void {
+  logger.debug(`MCP:${category}`, message, ...args);
+}
+
+/**
+ * Connects to the MCP server using the SDK.
+ * Implements a singleton pattern to prevent multiple connection attempts.
+ *
+ * @param forceReconnect Force a reconnection even if a client exists
+ * @returns Connected MCP client
+ */
+export async function connect(forceReconnect = false): Promise<boolean> {
+  // Force reconnection if requested
+  if (forceReconnect && client) {
+    log("CONNECT", "Force reconnect requested, closing existing connection");
+    closeConnection();
+  }
+
+  // Return existing client if it exists and isn't stale
+  if (
+    client &&
+    !forceReconnect &&
+    Date.now() - lastConnectionTime < RECONNECT_INTERVAL
+  ) {
+    log("CONNECT", "Using existing client connection");
+    return true;
+  }
+
+  // Return existing connection promise if one is in progress
+  if (connectionPromise && isConnecting) {
+    log(
+      "CONNECT",
+      "Connection already in progress, waiting for it to complete"
+    );
+    try {
+      await connectionPromise;
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Create new connection
+  isConnecting = true;
+  log("CONNECT", `Creating MCP client, connecting to ${MCP_SERVER_URL}`);
+
+  try {
+    connectionPromise = (async () => {
+      log("CONNECT", "Creating MCP client");
+
+      // Step 1: Create client with required capabilities
+      const newClient = new Client(
+        { name: "Orchestrator-MCP-Client", version: "1.0.0" },
+        {
+          capabilities: {
+            sampling: {},
+            resources: { listChanged: true },
+            tools: { listChanged: true },
+            prompts: { listChanged: true },
+          },
+        }
+      );
+
+      // Step 2: Set up notification handlers BEFORE connecting
+      log("SETUP", "Registering notification handlers");
+
+      newClient.setNotificationHandler(
+        LoggingMessageNotificationSchema,
+        (notification) => {
+          log("NOTIFICATION", "Logging message:", notification);
+        }
+      );
+
+      newClient.setNotificationHandler(
+        ResourceListChangedNotificationSchema,
+        (notification) => {
+          log("NOTIFICATION", "Resource list changed:", notification);
+        }
+      );
+
+      newClient.setNotificationHandler(
+        ToolListChangedNotificationSchema,
+        (notification) => {
+          log("NOTIFICATION", "Tool list changed:", notification);
+        }
+      );
+
+      newClient.setNotificationHandler(
+        PromptListChangedNotificationSchema,
+        (notification) => {
+          log("NOTIFICATION", "Prompt list changed:", notification);
+        }
+      );
+
+      // Step 3: Create transport
+      log(
+        "TRANSPORT",
+        `Creating StreamableHTTP transport for ${MCP_SERVER_URL}`
+      );
+      const newTransport = new StreamableHTTPClientTransport(
+        new URL(MCP_SERVER_URL)
+      );
+
+      // Register transport event handlers
+      newTransport.onclose = () => {
+        log("TRANSPORT", "Transport connection closed");
+        // Clear client if transport is closed
+        if (transport === newTransport) {
+          log("TRANSPORT", "Resetting client due to transport close");
+          client = null;
+          transport = null;
+        }
+      };
+
+      newTransport.onerror = (error) => {
+        log("TRANSPORT", "Transport error:", error);
+        // Log detailed error information
+        if (error instanceof Error) {
+          log("TRANSPORT", `Error details: ${error.message}`);
+          if (error.stack) {
+            log("TRANSPORT", `Stack trace: ${error.stack}`);
+          }
+        } else if (typeof error === "object") {
+          log("TRANSPORT", `Error object: ${JSON.stringify(error)}`);
+        }
+      };
+
+      // Step 4: Connect to server - this handles the proper initialization sequence
+      log("CONNECT", "Connecting to server (initializing connection)...");
+      try {
+        // This will:
+        // 1. Send the initialize request
+        // 2. Get server capabilities
+        // 3. Send initialized notification
+        log("INIT", "Starting MCP initialization sequence");
+        await newClient.connect(newTransport);
+        log("INIT", "MCP initialization sequence completed successfully");
+        log("CONNECT", "Successfully connected to server");
+
+        // Log server version for debugging
+        const serverInfo = newClient.getServerVersion();
+        log(
+          "SERVER",
+          `Connected to MCP server: ${serverInfo?.name || "unknown"} ${
+            serverInfo?.version || "unknown"
+          }`
+        );
+
+        // Update singleton state
+        client = newClient;
+        transport = newTransport;
+        lastConnectionTime = Date.now();
+
+        return newClient;
+      } catch (connectError) {
+        log("CONNECT", "Error during connect():", connectError);
+        // Log more details about the connection error
+        if (connectError instanceof Error) {
+          log("CONNECT", "Error message:", connectError.message);
+          log("CONNECT", "Error stack:", connectError.stack);
+        }
+
+        // Try to get more info about the transport state
+        if (newTransport) {
+          log("CONNECT", "Transport state info available");
+        }
+        throw connectError;
+      }
+    })();
+
+    await connectionPromise;
+    isConnecting = false;
+    return true;
+  } catch (error) {
+    log("CONNECT", "Connection failed:", error);
+    isConnecting = false;
+    return false;
+  }
+}
+
+/**
+ * List available resources from the MCP server
+ */
+export async function listResources(): Promise<ResourceResponse> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    log("RESOURCES", "Starting listResources call...");
+
+    // Use the high-level SDK method
+    const startTime = Date.now();
+    const response = await client.listResources();
+    const endTime = Date.now();
+
+    log(
+      "RESOURCES",
+      `listResources completed in ${endTime - startTime}ms`,
+      response
+    );
+    log(
+      "RESOURCES",
+      `Response type: ${typeof response}, keys: ${Object.keys(response || {})}`
+    );
+
+    return response as unknown as ResourceResponse;
+  } catch (error) {
+    log("RESOURCES", "Error listing resources:", error);
+    throw error;
+  }
+}
+
+/**
+ * List available tools from the MCP server
+ */
+export async function listTools(): Promise<ToolResponse> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    // Use the high-level SDK method
+    const response = await client.listTools();
+    return response as unknown as ToolResponse;
+  } catch (error) {
+    log("TOOLS", "Error listing tools:", error);
+    throw error;
+  }
+}
+
+/**
+ * List available prompts from the MCP server
+ */
+export async function listPrompts(): Promise<PromptResponse> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    // Use the high-level SDK method
+    const response = await client.listPrompts();
+    return response as unknown as PromptResponse;
+  } catch (error) {
+    log("PROMPTS", "Error listing prompts:", error);
+    throw error;
+  }
+}
+
+/**
+ * Read a resource by URI with error handling and retries
+ */
+export async function readResource(uri: string): Promise<any> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      log("RESOURCE", `Reading resource: ${uri}`);
+      const response = await client.readResource({ uri: uri });
+      return response;
+    } catch (error) {
+      log("RESOURCE", `Error reading resource ${uri}:`, error);
+      retries--;
+
+      if (retries === 0) {
+        throw error;
+      }
+
+      // Wait before retrying
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+}
+
+/**
+ * Call a tool with proper error handling
+ */
+export async function callTool(name: string, args: any = {}): Promise<any> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    log("TOOL", `Calling tool (clean-client): ${name} with args:`, args);
+    console.log(`[DEBUG CLEAN-CLIENT] Tool name: ${name}`);
+    console.log(`[DEBUG CLEAN-CLIENT] Args type: ${typeof args}`);
+    console.log(`[DEBUG CLEAN-CLIENT] Args keys: ${Object.keys(args || {})}`);
+    console.log(`[DEBUG CLEAN-CLIENT] Args JSON: ${JSON.stringify(args)}`);
+
+    const callPayload = { name, arguments: args };
+    console.log(
+      `[DEBUG CLEAN-CLIENT] Call payload: ${JSON.stringify(callPayload)}`
+    );
+
+    // Use the high-level SDK method
+    const response = await client.callTool(callPayload);
+
+    console.log(`[DEBUG CLEAN-CLIENT] Response: ${JSON.stringify(response)}`);
+    return response;
+  } catch (error) {
+    log("TOOL", `Error calling tool ${name}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Get a prompt with proper error handling
+ */
+export async function getPrompt(name: string, args: any = {}): Promise<any> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    log("PROMPT", `Getting prompt: ${name} with args:`, args);
+    const response = await client.getPrompt({
+      name: name,
+      arguments: args,
+    });
+    return response;
+  } catch (error) {
+    log("PROMPT", `Error getting prompt ${name}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Close the MCP connection
+ */
+export function closeConnection(): void {
+  if (transport) {
+    try {
+      transport.close();
+      log("CLOSE", "Closed transport connection");
+    } catch (error) {
+      log("CLOSE", "Error closing transport:", error);
+    }
+  }
+
+  // Reset state
+  client = null;
+  transport = null;
+  connectionPromise = null;
+  isConnecting = false;
+}
+
+/**
+ * Get connection info for diagnostics
+ */
+export function getConnectionInfo(): {
+  isConnected: boolean;
+  lastConnectionTime: number | null;
+  serverVersion?: ServerVersionInfo;
+} {
+  return {
+    isConnected: !!client,
+    lastConnectionTime: client ? lastConnectionTime : null,
+    serverVersion: client ? client.getServerVersion() : undefined,
+  };
+}
+
+/**
+ * Get a resource with generic return type
+ */
+/**
+ * Get resource with retry logic
+ */
+export async function getResourceWithRetry(
+  uri: string,
+  maxRetries = 3
+): Promise<any> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      log(
+        "RESOURCE",
+        "Attempting to get resource " +
+          uri +
+          " (attempt " +
+          attempt +
+          "/" +
+          maxRetries +
+          ")"
+      );
+      const result = await getResource(uri);
+      log("RESOURCE", "Successfully got resource " + uri);
+      return result;
+    } catch (error) {
+      log("RESOURCE", "Attempt " + attempt + " failed for " + uri + ":", error);
+      if (attempt === maxRetries) {
+        log("RESOURCE", "All attempts failed for " + uri);
+        throw error;
+      }
+      // Wait before retry (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+}
+
+export async function getResource(resourceId: string): Promise<any> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    const response = await client.readResource({ uri: resourceId });
+    return response;
+  } catch (error) {
+    // Special handling for different error types
+    if (error instanceof Error) {
+      if (
+        error.message.includes("Resource not found") ||
+        error.message.includes("404")
+      ) {
+        log("RESOURCE", `Resource not found: ${resourceId}`);
+        return null;
+      }
+    }
+
+    log("RESOURCE", `Error getting resource ${resourceId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Use a tool with proper error handling
+ */
+export async function useTool(toolId: string, args: any = {}): Promise<any> {
+  if (!client) {
+    await connect();
+  }
+
+  if (!client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    log("TOOL", `Using tool: ${toolId} with args:`, args);
+    const response = await client.callTool({
+      name: toolId,
+      arguments: args,
+    });
+    return response;
+  } catch (error) {
+    log("TOOL", `Error using tool ${toolId}:`, error);
+    throw error;
+  }
+}

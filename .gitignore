@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# ComfyUI custom data (large models and assets)
+comfyui-custom/
+comfyui-custom/custom_nodes
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+ui/node_modules
+ui/package-lock.json
+ui/dist
+node_modules/
+mcp-server/node_modules
+mcp-server/package-lock.json
+orchestrator/node_modules
+orchestrator/package-lock.json
+orchestrator/dist
+mcp-server/dist
+pnpm-lock.yaml
+intu-mcp/node_modules
+
+
+mcp-server/src/services/imageGen/*.safetensors
+*.safetensors

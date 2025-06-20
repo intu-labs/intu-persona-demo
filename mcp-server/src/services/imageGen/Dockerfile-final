@@ -1,0 +1,109 @@
+# ComfyUI for RunPod Serverless - Optimized for Network Storage
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies including gcc/g++ for nunchaku compilation
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    git \
+    wget \
+    curl \
+    build-essential \
+    gcc-11 \
+    g++-11 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set gcc/g++ to version 11 (required for nunchaku)
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+
+# Create comfyui user with proper UID/GID for RunPod compatibility
+RUN groupadd -r comfyui && useradd -r -g comfyui -u 1000 -m -s /bin/bash comfyui
+
+# Switch to comfyui user and set working directory
+USER comfyui
+WORKDIR /home/comfyui
+
+# Create Python virtual environment
+RUN python3 -m venv venv
+ENV PATH="/home/comfyui/venv/bin:$PATH"
+
+# Upgrade pip and install PyTorch with CUDA support
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install nunchaku dependencies
+RUN pip install --no-cache-dir \
+    ninja \
+    diffusers \
+    transformers \
+    accelerate \
+    sentencepiece \
+    protobuf \
+    opencv-python-headless \
+    GPUtil
+
+# Install the correct MIT nunchaku wheel
+RUN pip install https://github.com/mit-han-lab/nunchaku/releases/download/v0.2.0/nunchaku-0.2.0+torch2.5-cp310-cp310-linux_x86_64.whl
+
+# Clone and install ComfyUI
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git
+WORKDIR /home/comfyui/ComfyUI
+
+# Install ComfyUI dependencies
+RUN pip install -r requirements.txt
+
+# Install ComfyUI-nunchaku from GitHub
+RUN cd custom_nodes && git clone https://github.com/mit-han-lab/ComfyUI-nunchaku.git
+
+# Fix PuLID imports (not available in our nunchaku wheel)
+RUN printf "from .flux import NunchakuFluxDiTLoader\nfrom .text_encoder import NunchakuTextEncoderLoader\n\n__all__ = [\"NunchakuFluxDiTLoader\", \"NunchakuTextEncoderLoader\"]\n" > custom_nodes/ComfyUI-nunchaku/nodes/models/__init__.py
+RUN printf "# only import if running as a custom node\nfrom .nodes.lora import NunchakuFluxLoraLoader\nfrom .nodes.models import NunchakuFluxDiTLoader, NunchakuTextEncoderLoader\nfrom .nodes.preprocessors import FluxDepthPreprocessor\n\nNODE_CLASS_MAPPINGS = {\n    \"NunchakuFluxDiTLoader\": NunchakuFluxDiTLoader,\n    \"NunchakuTextEncoderLoader\": NunchakuTextEncoderLoader,\n    \"NunchakuFluxLoraLoader\": NunchakuFluxLoraLoader,\n    \"NunchakuDepthPreprocessor\": FluxDepthPreprocessor,\n}\nNODE_DISPLAY_NAME_MAPPINGS = {k: v.TITLE for k, v in NODE_CLASS_MAPPINGS.items()}\n__all__ = [\"NODE_CLASS_MAPPINGS\", \"NODE_DISPLAY_NAME_MAPPINGS\"]\n" > custom_nodes/ComfyUI-nunchaku/__init__.py
+
+# Switch to root to create directories and set permissions
+USER root
+
+# Create model directories and set permissions
+RUN mkdir -p /comfyui-models/models/diffusion_models \
+             /comfyui-models/models/text_encoders \
+             /comfyui-models/models/vae \
+             /comfyui-models/models/loras \
+             /comfyui-models/workflows \
+             /comfyui-models/output && \
+    chown -R comfyui:comfyui /comfyui-models
+
+# Switch back to comfyui user
+USER comfyui
+
+# Create symbolic links
+RUN ln -s /comfyui-models/models models && \
+    ln -s /comfyui-models/workflows workflows && \
+    mkdir -p input output && \
+    ln -s /comfyui-models/output output
+
+# Set environment variables for optimal performance
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPYCACHEPREFIX=/home/comfyui/.cache/pycache
+ENV CUDA_CACHE_PATH=/home/comfyui/.cache/cuda
+ENV HF_HOME=/home/comfyui/.cache/huggingface
+
+# Create cache directories
+RUN mkdir -p /home/comfyui/.cache/pycache /home/comfyui/.cache/cuda /home/comfyui/.cache/huggingface
+
+# Copy startup script
+COPY --chown=comfyui:comfyui runpod-start.sh /home/comfyui/runpod-start.sh
+RUN chmod +x /home/comfyui/runpod-start.sh
+
+# Start ComfyUI with RunPod-optimized settings
+CMD ["/home/comfyui/runpod-start.sh"]

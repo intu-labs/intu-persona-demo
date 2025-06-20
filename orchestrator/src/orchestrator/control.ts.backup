@@ -1,0 +1,460 @@
+/**
+ * Control Module
+ * 
+ * Handles the complete reasoning pipeline:
+ * 1. User query → LLM
+ * 2. Parse LLM response for MCP operations
+ * 3. Execute MCP operations
+ * 4. Feed results back to LLM
+ * 5. Generate final response
+ */
+
+import * as llmAdapter from '../llm/llm-adapter.js';
+import { 
+  connect, 
+  getResource, 
+  listResources, 
+  listTools, 
+  getConnectionInfo,
+  callTool
+} from './clean-client.js';
+import { 
+  formatResourcePath,
+  processContextResponse 
+} from './resource-helpers.js';
+
+// Define the message types for LLM
+type MessageRole = 'system' | 'user' | 'assistant';
+
+interface Message {
+  role: MessageRole;
+  content: string;
+}
+
+/**
+ * Pattern to match MCP operations in LLM output
+ * Updated to match both simple [MCP:resource-name] and complex [MCP:tool-name:param="value"] formats
+ */
+const MCP_OPERATION_PATTERN = /\[MCP:([\w-]+)(?::([^\]]+))?\]/g;
+
+/**
+ * Interface for MCP operation with parameters
+ */
+interface McpOperation {
+  name: string;      // Name of the resource or tool
+  params?: Record<string, string>; // Optional parameters for the operation
+  fullMatch: string; // The full matched text for replacement
+}
+
+/**
+ * Extract MCP operation tags from LLM output
+ */
+function extractMcpOperations(text: string): McpOperation[] {
+  const operations: McpOperation[] = [];
+  let match;
+  
+  // Reset the regex state
+  MCP_OPERATION_PATTERN.lastIndex = 0;
+  
+  while ((match = MCP_OPERATION_PATTERN.exec(text)) !== null) {
+    const name = match[1];
+    const paramString = match[2];
+    const fullMatch = match[0];
+    
+    const operation: McpOperation = {
+      name,
+      fullMatch
+    };
+    
+    // Parse parameters if they exist
+    if (paramString) {
+      const params: Record<string, string> = {};
+      
+      // Extract key=value pairs
+      // This handles both param=value and param="value with spaces"
+      const paramMatches = paramString.matchAll(/(\w+)=(?:"([^"]+)"|([^,\s]+))/g);
+      
+      for (const paramMatch of paramMatches) {
+        const key = paramMatch[1];
+        // The value is either in group 2 (quoted) or group 3 (unquoted)
+        const value = paramMatch[2] !== undefined ? paramMatch[2] : paramMatch[3];
+        params[key] = value;
+      }
+      
+      operation.params = params;
+    }
+    
+    operations.push(operation);
+  }
+  
+  return operations;
+}
+
+/**
+ * Clean up raw response from LLM by removing MCP tags but preserving markdown formatting
+ */
+function cleanupResponse(text: string): string {
+  // Remove all MCP tags and search operations - both the simple and complex patterns
+  const withoutMcpTags = text
+    .replace(/\[MCP:([\w-]+)(?::([^\]]+))?\]/g, '') // Standard MCP tags
+    .replace(/\[search-products:(?:[^\]]+)\]/g, '')  // Search product tags with params
+    .replace(/\[[\w-]+:[^\]]+\]/g, '');             // Any other remaining bracketed tags
+  
+  // Remove "ASSISTANT THINKING:" and similar development prompts
+  const withoutThinking = withoutMcpTags.replace(/ASSISTANT THINKING:[\s\S]*?(?=ASSISTANT:|$)/gi, '');
+  
+  // Remove any "ASSISTANT:" prefixes 
+  const withoutAssistantPrefix = withoutThinking.replace(/^ASSISTANT:\s*/gim, '');
+  
+  // Minimal cleanup to ensure basic markdown works properly
+  let cleanedText = withoutAssistantPrefix;
+  
+  // Fix potential issues with markdown lists (ensure proper spacing)
+  cleanedText = cleanedText
+    // Ensure proper spacing for bullet lists
+    .replace(/^(\s*)\*(\s*)/gm, '$1* $2')
+    // Ensure proper spacing for numbered lists
+    .replace(/^(\s*)\d+\.(\s*)/gm, '$1$&$2')
+    // Add proper spacing for headers
+    .replace(/^(\s*)#+(\s*)/gm, '$1$& ');
+  
+  // Remove excessive blank lines
+  cleanedText = cleanedText.replace(/\n{3,}/g, '\n\n');
+  
+  return cleanedText.trim();
+}
+
+/**
+ * Convert string parameters to their appropriate types
+ * (e.g., convert numeric strings to actual numbers)
+ */
+function convertParamTypes(params: Record<string, string> | undefined, toolName?: string): Record<string, any> {
+  if (!params) return {};
+  
+  const convertedParams: Record<string, any> = {};
+  
+  // Special handling for search-products to ensure query parameter is always present
+  if (toolName === 'search-products' && !params.query) {
+    convertedParams.query = ''; // Set empty string as default
+  }
+  
+  for (const [key, value] of Object.entries(params)) {
+    // Try to convert numeric strings to numbers
+    if (/^\d+$/.test(value)) {
+      // Integer
+      convertedParams[key] = parseInt(value, 10);
+    } else if (/^\d+\.\d+$/.test(value)) {
+      // Float
+      convertedParams[key] = parseFloat(value);
+    } else if (value === 'true') {
+      // Boolean true
+      convertedParams[key] = true;
+    } else if (value === 'false') {
+      // Boolean false
+      convertedParams[key] = false;
+    } else {
+      // Keep as string
+      convertedParams[key] = value;
+    }
+  }
+  
+  return convertedParams;
+}
+
+/**
+ * The main control class that manages the LLM → MCP → LLM reasoning flow
+ */
+export class Controller {
+  private history: Map<string, Message[]> = new Map();
+  private availableResources: string[] = [];
+  private availableTools: string[] = [];
+  private systemPrompt: string = '';
+  private initialized: boolean = false;
+  
+  constructor() {
+    console.log('[Control] Controller initialized');
+  }
+  
+  /**
+   * Initialize the controller by fetching available resources and tools
+   * and building the system prompt
+   */
+  async initialize(personaData?: any): Promise<boolean> {
+    if (this.initialized) {
+      return true;
+    }
+    
+    try {
+      console.log('[Control] Initializing controller, fetching MCP resources and tools');
+      
+      // Get available resources and tools
+      this.availableResources = await this.getAvailableResources();
+      this.availableTools = await this.getAvailableTools();
+      
+      console.log(`[Control] Found ${this.availableResources.length} resources and ${this.availableTools.length} tools`);
+      
+      // Build the system prompt based on available resources and tools
+      this.systemPrompt = this.buildSystemPrompt(
+        this.availableResources,
+        this.availableTools,
+        personaData
+      );
+      
+      this.initialized = true;
+      return true;
+    } catch (error) {
+      console.error('[Control] Error initializing controller:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Get the conversation history for a session, creating a new one if needed
+   */
+  private async getConversation(sessionId: string): Promise<Message[]> {
+    if (!this.history.has(sessionId)) {
+      // Create a new conversation with the system prompt
+      this.history.set(sessionId, [this.createSystemMessage()]);
+    }
+    
+    return this.history.get(sessionId)!;
+  }
+  
+  /**
+   * Create a system message with the configured prompt
+   */
+  private createSystemMessage(): Message {
+    return { 
+      role: 'system', 
+      content: this.systemPrompt || 'You are a helpful AI assistant.'
+    };
+  }
+  
+  /**
+   * Process a user message through the LLM reasoning pipeline
+   */
+  async processMessage(sessionId: string, userMessage: string): Promise<string> {
+    try {
+      console.log(`[Control] Processing message for session ${sessionId}`);
+      
+      // Get conversation history
+      const conversation = await this.getConversation(sessionId);
+      
+      // Add user message to conversation
+      conversation.push({ role: 'user', content: userMessage });
+      
+      // Generate initial response
+      console.log('[Control] Generating initial response');
+      const initialResponse = await llmAdapter.generate(conversation);
+      
+      // Extract MCP operations from response
+      const operations = extractMcpOperations(initialResponse);
+      
+      let finalResponse = initialResponse;
+      
+      // If operations were found, execute them and generate a new response
+      if (operations.length > 0) {
+        console.log(`[Control] Found ${operations.length} MCP operations to execute`);
+        
+        // Execute operations and collect results
+        const results = await this.executeMcpOperations(operations);
+        
+        // Add initial assistant response
+        conversation.push({ role: 'assistant', content: initialResponse });
+        
+        // Add operation results to conversation as a user message
+        const resultMessages = results.map(r => `[${r.operation}]\n${r.result}`).join('\n\n');
+        const operationResultsMessage = `Here are the results of the operations you wanted to perform:\n\n${resultMessages}`;
+        conversation.push({ role: 'user', content: operationResultsMessage });
+        
+        // Generate final response that incorporates the results
+        console.log('[Control] Generating final response with operation results');
+        finalResponse = await llmAdapter.generate(conversation);
+      }
+      
+      // Add final response to conversation history
+      conversation.push({ role: 'assistant', content: finalResponse });
+      
+      // Clean up the response before returning it
+      return cleanupResponse(finalResponse);
+    } catch (error) {
+      console.error('[Control] Error processing message:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Execute MCP operations extracted from LLM response
+   */
+  private async executeMcpOperations(operations: McpOperation[]): Promise<Array<{operation: string, result: string}>> {
+    const results: Array<{operation: string, result: string}> = [];
+    
+    for (const op of operations) {
+      try {
+        console.log(`[Control] Executing operation: ${op.name}`);
+        
+        // Check if this is a resource operation
+        if (this.availableResources.some(r => r.includes(op.name))) {
+          // Format the resource path properly
+          const resourcePath = formatResourcePath(op.name);
+          
+          // Get the resource
+          const resource = await getResource(resourcePath);
+          
+          // Extract text content if available
+          let resultText = 'No content available';
+          if (resource && resource.contents && resource.contents.length > 0) {
+            resultText = resource.contents.map((c: any) => c.text).join('\n\n');
+          }
+          
+          results.push({
+            operation: `Resource: ${op.name}`,
+            result: resultText
+          });
+        }
+        // Check if this is a tool operation
+        else if (this.availableTools.includes(op.name)) {
+          // Convert parameters to their appropriate types
+          const typedParams = convertParamTypes(op.params, op.name);
+          
+          // Call the tool
+          const toolResult = await callTool(op.name, typedParams);
+          
+          // Process the result
+          let resultText = JSON.stringify(toolResult, null, 2);
+          
+          // Special handling for search tools
+          if (op.name.startsWith('search-') && toolResult.content) {
+            resultText = processContextResponse(toolResult);
+          }
+          
+          results.push({
+            operation: `Tool: ${op.name}`,
+            result: resultText
+          });
+        }
+        else {
+          results.push({
+            operation: op.name,
+            result: `Operation not available: ${op.name} is neither a valid resource nor a valid tool.`
+          });
+        }
+      } catch (error) {
+        console.error(`[Control] Error executing operation ${op.name}:`, error);
+        
+        results.push({
+          operation: op.name,
+          result: `Error: ${error instanceof Error ? error.message : String(error)}`
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  /**
+   * Clear the conversation history for a session
+   */
+  clearConversation(sessionId: string): void {
+    if (this.history.has(sessionId)) {
+      this.history.set(sessionId, [this.createSystemMessage()]);
+    }
+  }
+  
+  /**
+   * Get available resources from the MCP server
+   */
+  async getAvailableResources(): Promise<string[]> {
+    try {
+      const resourcesResp = await listResources();
+      
+      const resources = resourcesResp.resources?.map(r => {
+        if (r.uri) return r.uri;
+        if (r.id) return r.id;
+        if (r.name) return r.name;
+        return null;
+      }).filter(Boolean) as string[];
+      
+      return resources || [];
+    } catch (error) {
+      console.error('[Control] Error getting available resources:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Get available tools from the MCP server
+   */
+  async getAvailableTools(): Promise<string[]> {
+    try {
+      const toolsResp = await listTools();
+      
+      const tools = toolsResp.tools?.map(t => {
+        if (t.name) return t.name;
+        if (t.id) return t.id;
+        return null;
+      }).filter(Boolean) as string[];
+      
+      return tools || [];
+    } catch (error) {
+      console.error('[Control] Error getting available tools:', error);
+      return [];
+    }
+  }
+  
+  /**
+   * Call an MCP tool with proper error handling
+   */
+  async callMcpTool(name: string, args: any): Promise<any> {
+    try {
+      const result = await callTool(name, args);
+      return result;
+    } catch (error) {
+      console.error(`[Control] Error calling MCP tool ${name}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Build the system prompt based on available resources and tools
+   */
+  private buildSystemPrompt(
+    resources: string[],
+    tools: string[],
+    personaData?: any
+  ): string {
+    // Basic persona template
+    let prompt = `You are a helpful AI assistant that provides information and assistance.
+
+You have access to the following resources and tools:`;
+
+    // Add available resources
+    if (resources.length > 0) {
+      prompt += `\n\nRESOURCES:`;
+      resources.forEach(r => {
+        prompt += `\n- ${r}`;
+      });
+      
+      prompt += `\n\nYou can access resources using the [MCP:resource-name] syntax.`;
+    }
+    
+    // Add available tools
+    if (tools.length > 0) {
+      prompt += `\n\nTOOLS:`;
+      tools.forEach(t => {
+        prompt += `\n- ${t}`;
+      });
+      
+      prompt += `\n\nYou can call tools using the [MCP:tool-name:param="value"] syntax.`;
+    }
+    
+    // Add examples
+    prompt += `\n\nExample usage:
+- To access a resource: [MCP:context]
+- To call a tool: [MCP:search-context:query="example query"]
+
+Always respond in a helpful, accurate, and concise manner.`;
+
+    return prompt;
+  }
+} 

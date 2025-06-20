@@ -1,0 +1,100 @@
+# ComfyUI Image Generation Service - Production Build with Nunchaku
+# Fixed to install custom nodes during build for proper Python import
+FROM nvidia/cuda:12.8.0-devel-ubuntu22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies including gcc/g++ for nunchaku compilation
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    python3-dev \
+    git \
+    wget \
+    curl \
+    build-essential \
+    gcc-11 \
+    g++-11 \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set gcc/g++ to version 11 (required for nunchaku)
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-11 100
+RUN update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-11 100
+
+# Create comfyui user with proper UID/GID for compatibility
+RUN groupadd -r comfyui && useradd -r -g comfyui -u 1000 -m -s /bin/bash comfyui
+
+# Switch to comfyui user and set working directory
+USER comfyui
+WORKDIR /home/comfyui
+
+# Create Python virtual environment
+RUN python3 -m venv venv
+ENV PATH="/home/comfyui/venv/bin:$PATH"
+
+# Upgrade pip and install PyTorch with CUDA support (matching CUDA 12.8)
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install nunchaku dependencies first
+RUN pip install ninja diffusers transformers accelerate sentencepiece protobuf huggingface_hub \
+    insightface opencv-python facexlib onnxruntime timm GPUtil
+
+# ===== CRITICAL FIX: Install the CORRECT MIT nunchaku wheel =====
+# The PyPI "nunchaku" package is a completely different Nintendo controller library!
+# We need the MIT SVDQuant nunchaku from their GitHub releases
+RUN pip install https://github.com/mit-han-lab/nunchaku/releases/download/v0.2.0/nunchaku-0.2.0+torch2.5-cp310-cp310-linux_x86_64.whl
+
+# Clone and install ComfyUI
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git
+WORKDIR /home/comfyui/ComfyUI
+
+# Install ComfyUI dependencies
+RUN pip install -r requirements.txt
+
+# ===== Install ComfyUI-nunchaku from GitHub =====
+# Clone the official ComfyUI-nunchaku repository
+RUN cd custom_nodes && git clone https://github.com/mit-han-lab/ComfyUI-nunchaku.git
+
+# ===== FIX: Remove PuLID imports (not available in our nunchaku wheel) =====
+# Fix the models/__init__.py to remove PuLID imports
+RUN printf "from .flux import NunchakuFluxDiTLoader\nfrom .text_encoder import NunchakuTextEncoderLoader\n\n__all__ = [\"NunchakuFluxDiTLoader\", \"NunchakuTextEncoderLoader\"]\n" > custom_nodes/ComfyUI-nunchaku/nodes/models/__init__.py
+
+# Fix the main __init__.py to remove PuLID imports and mappings
+RUN printf "# only import if running as a custom node\nfrom .nodes.lora import NunchakuFluxLoraLoader\nfrom .nodes.models import NunchakuFluxDiTLoader, NunchakuTextEncoderLoader\nfrom .nodes.preprocessors import FluxDepthPreprocessor\n\nNODE_CLASS_MAPPINGS = {\n    \"NunchakuFluxDiTLoader\": NunchakuFluxDiTLoader,\n    \"NunchakuTextEncoderLoader\": NunchakuTextEncoderLoader,\n    \"NunchakuFluxLoraLoader\": NunchakuFluxLoraLoader,\n    \"NunchakuDepthPreprocessor\": FluxDepthPreprocessor,\n}\nNODE_DISPLAY_NAME_MAPPINGS = {k: v.TITLE for k, v in NODE_CLASS_MAPPINGS.items()}\n__all__ = [\"NODE_CLASS_MAPPINGS\", \"NODE_DISPLAY_NAME_MAPPINGS\"]\n" > custom_nodes/ComfyUI-nunchaku/__init__.py
+
+# Create directory structure for volume mounts (models only, not custom_nodes)
+RUN mkdir -p models/diffusion_models models/loras models/text_encoders models/vae workflows
+
+# Copy workflow template for testing
+#COPY --chown=comfyui:comfyui ./mcp-server/src/services/imageGen/workflows/profile-picture-simple.json ./workflows/
+
+# Create data directories for volume mounts
+RUN mkdir -p /home/comfyui/data/input /home/comfyui/data/output
+
+# Expose ComfyUI port
+EXPOSE 8188
+
+# Set environment variables for optimal performance
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPYCACHEPREFIX=/home/comfyui/.cache/pycache
+ENV CUDA_CACHE_PATH=/home/comfyui/.cache/cuda
+ENV HF_HOME=/home/comfyui/.cache/huggingface
+
+# Create cache directories
+RUN mkdir -p /home/comfyui/.cache/pycache /home/comfyui/.cache/cuda /home/comfyui/.cache/huggingface
+
+# Health check to ensure ComfyUI is running
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8188/system_stats || exit 1
+
+# Start ComfyUI with production settings
+CMD ["python3", "main.py", "--listen", "0.0.0.0", "--port", "8188", "--dont-print-server"] 

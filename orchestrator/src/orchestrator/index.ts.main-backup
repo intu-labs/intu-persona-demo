@@ -1,0 +1,259 @@
+/**
+ * Orchestrator
+ *
+ * Core orchestration layer focused on establishing and maintaining
+ * connections to the MCP server and handling message passing.
+ */
+
+import { connect, listResources, getResource } from "./clean-client.js";
+import { Controller } from "./control.js";
+import { formatResourcePath } from "./resource-helpers.js";
+import { ConversationService } from "../services/conversationService.js";
+
+// Define the OrchestratorState type to include all needed states
+export type OrchestratorState =
+  | "idle"
+  | "initializing"
+  | "connecting"
+  | "connected"
+  | "ready"
+  | "error";
+
+// Helper function to check if a state is a connected state
+function isConnectedState(state: OrchestratorState): boolean {
+  return state === "connected" || state === "ready";
+}
+
+/**
+ * Simple logger for orchestrator operations
+ */
+function logOrchestrator(msg: string, ...args: any[]) {
+  console.log(`[Orchestrator ${new Date().toISOString()}] ${msg}`, ...args);
+}
+
+/**
+ * Core orchestrator implementation
+ */
+export class AgentOrchestrator {
+  private state: OrchestratorState = "idle";
+  private connectionPromise: Promise<any> | null = null;
+  private isConnecting: boolean = false;
+  private connectionError: Error | null = null;
+  private sessionMessages: Map<string, string[]> = new Map();
+  private controller: Controller;
+  private controllerInitialized: boolean = false;
+  private personaData: any;
+  private conversationService: ConversationService;
+
+  /**
+   * Creates a new Orchestrator instance
+   */
+  constructor() {
+    this.controller = new Controller();
+    this.conversationService = new ConversationService();
+    this.state = "idle";
+    logOrchestrator("Orchestrator created");
+  }
+
+  /**
+   * Get current connection state
+   */
+  getState(): OrchestratorState {
+    return this.state;
+  }
+
+  /**
+   * Get connection error if any
+   */
+  getError(): Error | null {
+    return this.connectionError;
+  }
+
+  /**
+   * Get MCP connection info
+   */
+  getMcpInfo(): any {
+    return {
+      isConnected: this.state === "connected",
+      lastConnectionTime: Date.now(),
+      serverVersion: { name: "MCP Server", version: "1.0" },
+    };
+  }
+
+  /**
+   * Wait for a resource's content to be available, with retries
+   */
+  private async waitForResourceContent(
+    resourceUri: string,
+    maxAttempts = 5
+  ): Promise<any | null> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const resourcesResp = await listResources();
+        const resources =
+          (resourcesResp.resources
+            ?.map((r) => r.uri || r.id || r.name)
+            .filter(Boolean) as string[]) || [];
+        if (!resources.includes(resourceUri)) {
+          await new Promise((res) =>
+            setTimeout(res, Math.pow(2, attempt) * 1000)
+          );
+          continue;
+        }
+        const resource = await getResource(resourceUri);
+        if (resource && resource.contents && resource.contents.length > 0) {
+          return resource;
+        }
+      } catch (error) {
+        // Optionally log error
+      }
+      await new Promise((res) => setTimeout(res, Math.pow(2, attempt) * 1000));
+    }
+    return null;
+  }
+
+  /**
+   * Connect to the MCP server and initialize the controller
+   */
+  async connect(): Promise<boolean> {
+    try {
+      this.state = "connecting";
+      console.log("[Orchestrator] Connecting to MCP server");
+      const connected = await connect();
+      if (!connected) {
+        console.error("[Orchestrator] Failed to connect to MCP");
+        this.state = "error";
+        return false;
+      }
+      // Wait for persona and policies resource content to be available
+      const personaData = await this.waitForResourceContent(
+        "persona://all"
+      );
+      if (!personaData) {
+        console.log("[Orchestrator] Resource loading details:", { personaData: !!this.personaData, state: this.state });\n      console.warn(
+          "[Orchestrator] persona://parameters content not available after retries, using default persona"
+        );
+      } else {
+        this.personaData = personaData;
+        console.log("[Orchestrator] Loaded persona from MCP");
+      }
+      const policiesData = await this.waitForResourceContent("policies://all");
+      if (!policiesData) {
+        console.warn(
+          "[Orchestrator] policies://all content not available after retries, using default policies"
+        );
+      }
+      console.log("[Orchestrator] Initializing controller");
+      const initialized = await this.controller.initialize(this.personaData);
+      if (initialized) {
+        this.state = "connected";
+        console.log("[Orchestrator] Orchestrator ready");
+        return true;
+      } else {
+        this.state = "error";
+        console.error("[Orchestrator] Failed to initialize controller");
+        return false;
+      }
+    } catch (error) {
+      this.state = "error";
+      console.error("[Orchestrator] Error during connect:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Handle incoming message
+   */
+  async handleMessage(sessionId: string, message: string): Promise<string> {
+    // Ensure the controller is initialized
+    if (!this.controllerInitialized) {
+      // Try to connect and initialize if not already done
+      const success = await this.connect();
+      if (success) {
+        this.controllerInitialized = true;
+      } else {
+        return "Cannot process message: AI agent is not initialized. Please try again later.";
+      }
+    }
+
+    try {
+      // Store the user message in MongoDB
+      await this.conversationService.storeUserMessage(sessionId, message);
+
+      // Initialize session if needed (for backwards compatibility)
+      if (!this.sessionMessages.has(sessionId)) {
+        this.sessionMessages.set(sessionId, []);
+      }
+
+      // Store the message in memory as well (for current session handling)
+      const messages = this.sessionMessages.get(sessionId)!;
+      messages.push(message);
+
+      // Process the message through the controller
+      const response = await this.controller.processMessage(sessionId, message);
+
+      // Store the assistant response in MongoDB
+      await this.conversationService.storeAssistantMessage(sessionId, response);
+
+      return response;
+    } catch (error) {
+      console.error("[Orchestrator] Error processing message:", error);
+      return `Error processing your message: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  }
+
+  /**
+   * Clear conversation history for a session
+   */
+  async clearSession(sessionId: string): Promise<void> {
+    // Clear from memory
+    this.sessionMessages.delete(sessionId);
+    this.controller.clearConversation(sessionId);
+
+    // Clear from MongoDB
+    await this.conversationService.clearSession(sessionId);
+  }
+
+  /**
+   * Get all available resources
+   */
+  async getAvailableResources(): Promise<string[]> {
+    return this.controller.getAvailableResources();
+  }
+
+  /**
+   * Get all available tools
+   */
+  async getAvailableTools(): Promise<string[]> {
+    return this.controller.getAvailableTools();
+  }
+
+  /**
+   * Get conversation history for a session
+   */
+  async getConversationHistory(sessionId: string): Promise<any[]> {
+    return this.conversationService.getConversationHistory(sessionId);
+  }
+
+  /**
+   * Get all sessions
+   */
+  async getAllSessions(): Promise<any[]> {
+    return this.conversationService.getAllSessions();
+  }
+
+  /**
+   * Force a reconnection to MCP and reinitialize
+   */
+  async forceReconnect(): Promise<boolean> {
+    this.state = "connecting"; // Use a valid state
+    // Reset initialized flag
+    this.controllerInitialized = false;
+    return this.connect();
+  }
+}
+
+// Export the orchestrator as the default export
+export default AgentOrchestrator;

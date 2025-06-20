@@ -1,0 +1,50 @@
+# Official RunPod ComfyUI Worker Style
+ARG RUNPOD_WORKER_VERSION=5.1.0
+FROM runpod/worker-comfyui:${RUNPOD_WORKER_VERSION}-base
+
+# Set working directory (already /workspace in base)
+# WORKDIR /workspace
+
+# Install Nunchaku specific dependencies (ninja, etc.)
+# The base image should have most system deps, but we might need some for nunchaku
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ninja-build \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install PyTorch (ensure it matches ComfyUI and Nunchaku needs if base doesn't have it or has wrong version)
+# RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install Nunchaku and its direct Python dependencies
+RUN pip install --no-cache-dir \
+    # diffusers, transformers, accelerate, etc. are likely in base or ComfyUI reqs
+    sentencepiece \
+    protobuf \
+    opencv-python-headless \
+    GPUtil
+
+RUN pip install https://github.com/mit-han-lab/nunchaku/releases/download/v0.2.0/nunchaku-0.2.0+torch2.5-cp310-cp310-linux_x86_64.whl
+
+# ComfyUI is already in the base image at /opt/ComfyUI or similar
+# We need to install our custom node into that existing ComfyUI installation
+# First, find ComfyUI directory (it's /opt/ComfyUI in the official image)
+WORKDIR /opt/ComfyUI/custom_nodes
+RUN git clone https://github.com/mit-han-lab/ComfyUI-nunchaku.git
+
+# Fix Nunchaku imports (adjust path if ComfyUI's custom_nodes dir is different)
+RUN printf "from .flux import NunchakuFluxDiTLoader\nfrom .text_encoder import NunchakuTextEncoderLoader\n\n__all__ = [\"NunchakuFluxDiTLoader\", \"NunchakuTextEncoderLoader\"]\n" > ComfyUI-nunchaku/nodes/models/__init__.py
+RUN printf "# only import if running as a custom node\nfrom .nodes.lora import NunchakuFluxLoraLoader\nfrom .nodes.models import NunchakuFluxDiTLoader, NunchakuTextEncoderLoader\nfrom .nodes.preprocessors import FluxDepthPreprocessor\n\nNODE_CLASS_MAPPINGS = {\n    \"NunchakuFluxDiTLoader\": NunchakuFluxDiTLoader,\n    \"NunchakuTextEncoderLoader\": NunchakuTextEncoderLoader,\n    \"NunchakuFluxLoraLoader\": NunchakuFluxLoraLoader,\n    \"NunchakuDepthPreprocessor\": FluxDepthPreprocessor,\n}\nNODE_DISPLAY_NAME_MAPPINGS = {k: v.TITLE for k, v in NODE_CLASS_MAPPINGS.items()}\n__all__ = [\"NODE_CLASS_MAPPINGS\", \"NODE_DISPLAY_NAME_MAPPINGS\"]\n" > ComfyUI-nunchaku/__init__.py
+
+# Copy your handler script (ensure it's compatible with their ComfyUI path and model loading)
+WORKDIR /workspace # Switch back to /workspace for handler
+COPY handler.py /workspace/handler.py
+RUN chmod +x /workspace/handler.py
+
+# Set environment variables (PYTHONUNBUFFERED is good, others might be set by base)
+ENV PYTHONUNBUFFERED=1
+
+# The base image's CMD will likely already call its own handler.
+# We need to ensure OUR handler.py is called.
+# The official runpod/worker-comfyui calls `python src/rp_handler.py`
+# We will override this with our handler.
+CMD ["python", "/workspace/handler.py"]

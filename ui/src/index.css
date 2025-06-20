@@ -1,0 +1,440 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.75rem;
+
+    /* INTU Brand Colors */
+    --deep-navy: 209 49% 11%;
+    --cream-white: 39 56% 90%;
+    --burnt-orange: 14 84% 59%;
+    --muted-coral: 11 67% 62%;
+    --cool-mint: 90 33% 83%;
+    --bright-cyan: 194 100% 32%;
+  }
+
+  .dark {
+    --background: 209 49% 11%;
+    --foreground: 39 56% 90%;
+    --card: 209 49% 15%;
+    --card-foreground: 39 56% 90%;
+    --popover: 209 49% 15%;
+    --popover-foreground: 39 56% 90%;
+    --primary: 14 84% 59%;
+    --primary-foreground: 39 56% 90%;
+    --secondary: 209 49% 15%;
+    --secondary-foreground: 39 56% 90%;
+    --muted: 209 49% 20%;
+    --muted-foreground: 39 56% 70%;
+    --accent: 11 67% 62%;
+    --accent-foreground: 39 56% 90%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 39 56% 90%;
+    --border: 209 49% 20%;
+    --input: 209 49% 20%;
+    --ring: 14 84% 59%;
+  }
+
+  /* Persona Theme: Bohemian */
+  .theme-bohemian {
+    --background: 30 30% 10%;
+    --foreground: 39 56% 90%;
+    --card: 30 30% 15%;
+    --card-foreground: 39 56% 90%;
+    --primary: 11 67% 62%;
+    --primary-foreground: 39 56% 90%;
+    --secondary: 30 30% 20%;
+    --secondary-foreground: 39 56% 90%;
+    --accent: 30 60% 50%;
+    --accent-foreground: 39 56% 90%;
+    --border: 30 30% 25%;
+    --font-accent: var(--font-space-grotesk);
+  }
+
+  /* Persona Theme: Alien */
+  .theme-alien {
+    --background: 180 50% 10%;
+    --foreground: 180 100% 90%;
+    --card: 180 50% 15%;
+    --card-foreground: 180 100% 90%;
+    --primary: 194 100% 32%;
+    --primary-foreground: 180 100% 90%;
+    --secondary: 180 50% 20%;
+    --secondary-foreground: 180 100% 90%;
+    --accent: 160 100% 50%;
+    --accent-foreground: 180 100% 90%;
+    --border: 180 50% 25%;
+    --font-accent: monospace;
+  }
+
+  /* Persona Theme: Militant */
+  .theme-militant {
+    --background: 60 20% 10%;
+    --foreground: 60 10% 90%;
+    --card: 60 20% 15%;
+    --card-foreground: 60 10% 90%;
+    --primary: 14 84% 59%;
+    --primary-foreground: 60 10% 90%;
+    --secondary: 60 20% 20%;
+    --secondary-foreground: 60 10% 90%;
+    --accent: 50 50% 50%;
+    --accent-foreground: 60 10% 90%;
+    --border: 60 20% 25%;
+    --font-accent: var(--font-inter);
+  }
+
+  /* Persona Theme: Fashionable */
+  .theme-fashionable {
+    --background: 330 30% 10%;
+    --foreground: 39 56% 90%;
+    --card: 330 30% 15%;
+    --card-foreground: 39 56% 90%;
+    --primary: 330 80% 60%;
+    --primary-foreground: 39 56% 90%;
+    --secondary: 330 30% 20%;
+    --secondary-foreground: 39 56% 90%;
+    --accent: 45 100% 50%;
+    --accent-foreground: 39 56% 90%;
+    --border: 330 30% 25%;
+    --font-accent: var(--font-space-grotesk);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .grid-pattern {
+    background-size: 40px 40px;
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  }
+
+  .theme-bohemian .grid-pattern {
+    background-image: linear-gradient(to right, rgba(226, 114, 91, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(226, 114, 91, 0.1) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .theme-alien .grid-pattern {
+    background-image: linear-gradient(to right, rgba(0, 255, 255, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .theme-militant .grid-pattern {
+    background-image: linear-gradient(to right, rgba(100, 120, 0, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(100, 120, 0, 0.1) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .theme-fashionable .grid-pattern {
+    background-image: linear-gradient(to right, rgba(255, 215, 0, 0.1) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 215, 0, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .chat-bubble {
+    @apply relative rounded-2xl p-4 transition-all duration-300 ease-in-out;
+  }
+
+  .chat-bubble:hover {
+    transform: scale(1.01);
+  }
+
+  .chat-bubble-user {
+    @apply bg-primary text-primary-foreground ml-12;
+  }
+  
+  .chat-bubble-agent {
+    @apply bg-card text-card-foreground mr-12;
+  }
+
+  .quick-reply-button {
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition-all duration-200 
+    bg-secondary text-secondary-foreground hover:bg-secondary/80 hover:scale-105;
+  }
+
+  .gradient-bg {
+    @apply bg-gradient-to-br from-deep-navy via-muted-coral/20 to-deep-navy;
+  }
+
+  /* Update persona profile styles */
+  .persona-profile {
+    @apply relative rounded-3xl overflow-hidden border-2 border-accent shadow-lg transition-all duration-300;
+    aspect-ratio: 9 / 16;
+  }
+
+  .persona-profile:hover {
+    @apply border-primary shadow-xl;
+    transform: scale(1.02);
+  }
+
+  /* Fix persona image to fill entire frame */
+  .persona-profile img {
+    @apply w-full h-full object-cover;
+  }
+
+  /* Position persona name outside image container */
+  .persona-name {
+    @apply text-center font-semibold text-sm mt-3 px-2 text-foreground;
+  }
+  
+  .padlock-icon {
+    @apply transition-all duration-300;
+  }
+  
+  .padlock-icon.connected {
+    @apply text-green-500;
+  }
+  
+  .padlock-icon.disconnected {
+    @apply text-red-500;
+  }
+  
+  .menu-item {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-200
+    hover:bg-accent hover:text-accent-foreground;
+  }
+  
+  .menu-item.active {
+    @apply bg-accent text-accent-foreground;
+  }
+}
+
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(-2deg);
+  }
+  50% {
+    transform: rotate(2deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-in-out;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s infinite;
+}
+
+/* INTU WebKit Modal Fixes - Enhanced Approach */
+/* Target all possible INTU modal containers and hide scrollbars */
+[role="dialog"],
+[class*="Modal"],
+[class*="modal"],
+[class*="popup"],
+[class*="overlay"],
+div[style*="position: fixed"],
+div[style*="z-index"] {
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important; /* IE/Edge */
+}
+
+/* Hide webkit scrollbars for INTU modals */
+[role="dialog"]::-webkit-scrollbar,
+[class*="Modal"]::-webkit-scrollbar,
+[class*="modal"]::-webkit-scrollbar,
+[class*="popup"]::-webkit-scrollbar,
+[class*="overlay"]::-webkit-scrollbar,
+div[style*="position: fixed"]::-webkit-scrollbar,
+div[style*="z-index"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Also target any children of modals */
+[role="dialog"] *,
+[class*="Modal"] *,
+[class*="modal"] *,
+[class*="popup"] *,
+[class*="overlay"] * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[role="dialog"] *::-webkit-scrollbar,
+[class*="Modal"] *::-webkit-scrollbar,
+[class*="modal"] *::-webkit-scrollbar,
+[class*="popup"] *::-webkit-scrollbar,
+[class*="overlay"] *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+}
+
+/* Mobile-first improvements */
+@media (max-width: 768px) {
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+  
+  /* Ensure proper spacing on mobile */
+  .chat-bubble {
+    margin-left: 0.5rem;
+    margin-right: 0.5rem;
+  }
+  
+  .chat-bubble-user {
+    margin-left: 1rem;
+    margin-right: 0.5rem;
+  }
+  
+  .chat-bubble-agent {
+    margin-left: 0.5rem;
+    margin-right: 1rem;
+  }
+  
+  /* Improved mobile sidebar */
+  .sidebar-overlay {
+    backdrop-filter: blur(4px);
+  }
+
+  /* Mobile modal fixes */
+  [role="dialog"] {
+    max-width: 90vw !important;
+    max-height: 80vh !important;
+  }
+}
+
+/* Chat Message Formatting */
+.prose {
+  color: inherit;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  color: inherit;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose p {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose ul, .prose ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.prose li {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.prose strong {
+  font-weight: 600;
+  color: inherit;
+}
+
+.prose em {
+  font-style: italic;
+  color: inherit;
+}
+
+.prose code {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose pre {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.prose blockquote {
+  border-left: 4px solid hsl(var(--border));
+  padding-left: 1rem;
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}

@@ -1,0 +1,40 @@
+# Use official RunPod ComfyUI serverless worker as base (SD3 variant)
+ARG RUNPOD_WORKER_VERSION=5.1.0
+FROM runpod/worker-comfyui:${RUNPOD_WORKER_VERSION}-sd3
+RUN python -c "import torch; print('PyTorch version:', torch.__version__)"
+# System dependencies for Nunchaku
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ninja-build \
+    libgl1 \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Nunchaku requirements (use correct torch 2.7 wheel)
+RUN pip install --no-cache-dir \
+    sentencepiece \
+    protobuf \
+    opencv-python-headless \
+    GPUtil \
+    https://github.com/mit-han-lab/nunchaku/releases/download/v0.2.0/nunchaku-0.2.0+torch2.7-cp312-cp312-linux_x86_64.whl
+
+# Install ComfyUI-nunchaku custom node - FIX: Install to correct location
+WORKDIR /comfyui
+RUN cd custom_nodes && git clone https://github.com/mit-han-lab/ComfyUI-nunchaku.git
+
+# Fix PuLID imports (not available in our nunchaku wheel)
+RUN printf "from .flux import NunchakuFluxDiTLoader\nfrom .text_encoder import NunchakuTextEncoderLoader\n\n__all__ = [\"NunchakuFluxDiTLoader\", \"NunchakuTextEncoderLoader\"]\n" > custom_nodes/ComfyUI-nunchaku/nodes/models/__init__.py
+RUN printf "# only import if running as custom node\nfrom .nodes.lora import NunchakuFluxLoraLoader\nfrom .nodes.models import NunchakuFluxDiTLoader, NunchakuTextEncoderLoader\nfrom .nodes.preprocessors import FluxDepthPreprocessor\n\nNODE_CLASS_MAPPINGS = {\n    \"NunchakuFluxDiTLoader\": NunchakuFluxDiTLoader,\n    \"NunchakuTextEncoderLoader\": NunchakuTextEncoderLoader,\n    \"NunchakuFluxLoraLoader\": NunchakuFluxLoraLoader,\n    \"NunchakuDepthPreprocessor\": FluxDepthPreprocessor,\n}\nNODE_DISPLAY_NAME_MAPPINGS = {k: v.TITLE for k, v in NODE_CLASS_MAPPINGS.items()}\n__all__ = [\"NODE_CLASS_MAPPINGS\", \"NODE_DISPLAY_NAME_MAPPINGS\"]\n" > custom_nodes/ComfyUI-nunchaku/__init__.py
+
+# Copy startup script
+COPY start_script.sh /start_script.sh
+RUN chmod +x /start_script.sh
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Set environment variables
+ENV COMFYUI_PATH=/comfyui \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    PYTHONUNBUFFERED=1
+
+# Start with our script
+CMD ["/entrypoint.sh"]

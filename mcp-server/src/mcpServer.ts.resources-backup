@@ -1,0 +1,574 @@
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { logger } from "./utils/logger.js";
+import { z } from "zod";
+import mongoose from "mongoose";
+import { connectDatabase } from "./utils/database.js";
+import { normalizeSearchText, searchCollection } from "./services/search.js";
+import {
+  generatePersona,
+  storePersonaInCache,
+  getPersonaFromCache,
+  rerollPersona,
+  getRerollCount,
+} from "./services/personaGenerator.js";
+
+// Interface for resource mapping
+interface ResourceMapping {
+  clientPath: string; // Base path in the client URI (e.g., 'sessions')
+  dbCollection: string; // MongoDB collection name
+  parameterPattern?: RegExp; // Pattern to extract parameters from the URI
+}
+
+// Resource mapping definitions
+const RESOURCE_MAPPINGS: ResourceMapping[] = [
+  {
+    clientPath: "sessions",
+    dbCollection: "chatsessions",
+    parameterPattern: /^sessions:\/\/(.+)$/,
+  },
+  {
+    clientPath: "chats",
+    dbCollection: "chathistories",
+    parameterPattern: /^chats:\/\/(.+)$/,
+  },
+];
+
+/**
+ * Maps a client resource URI to the appropriate database collection
+ */
+function mapResourceToCollection(uri: string): string {
+  logger.debug(`Mapping resource URI: ${uri}`);
+
+  for (const mapping of RESOURCE_MAPPINGS) {
+    if (mapping.parameterPattern?.test(uri)) {
+      logger.debug(`Mapped ${uri} to collection: ${mapping.dbCollection}`);
+      return mapping.dbCollection;
+    }
+  }
+
+  // Default fallback handling
+  const basePathMatch = uri.match(/^([^:]+):\/\//);
+  if (basePathMatch) {
+    const basePath = basePathMatch[1];
+    // Try to find a match just based on the base path
+    const mapping = RESOURCE_MAPPINGS.find((m) => m.clientPath === basePath);
+    if (mapping) {
+      logger.debug(
+        `Fallback mapped ${uri} to collection: ${mapping.dbCollection}`
+      );
+      return mapping.dbCollection;
+    }
+  }
+
+  logger.warn(`Unknown resource URI: ${uri}, could not map to collection`);
+  throw new Error(`Unknown resource URI: ${uri}`);
+}
+
+/**
+ * Extracts parameter from a resource URI based on its pattern
+ */
+function extractResourceParameter(uri: string): string | null {
+  logger.debug(`Extracting parameter from URI: ${uri}`);
+
+  for (const mapping of RESOURCE_MAPPINGS) {
+    if (mapping.parameterPattern) {
+      const match = uri.match(mapping.parameterPattern);
+      if (match && match[1]) {
+        logger.debug(`Extracted parameter from ${uri}: ${match[1]}`);
+        return match[1];
+      }
+    }
+  }
+
+  logger.debug(`No parameter found in URI: ${uri}`);
+  return null;
+}
+
+/**
+ * Gets resource data from MongoDB based on URI
+ */
+export async function getResource(
+  uri: string,
+  options: { limit?: number } = {}
+): Promise<any[]> {
+  logger.debug(`[GET_RESOURCE] Getting resource for URI: ${uri}`);
+
+  try {
+    const collectionName = mapResourceToCollection(uri);
+    logger.debug(`[GET_RESOURCE] Mapped to collection: ${collectionName}`);
+
+    const parameter = extractResourceParameter(uri);
+    logger.debug(`[GET_RESOURCE] Extracted parameter: ${parameter}`);
+
+    const collection = mongoose.connection.collection(collectionName);
+    logger.debug(
+      `[GET_RESOURCE] Got collection reference, readyState: ${mongoose.connection.readyState}`
+    );
+
+    // Build query based on resource type and parameter
+    let query: Record<string, any> = {};
+
+    if (parameter) {
+      if (uri.startsWith("sessions://")) {
+        if (parameter === "all") {
+          // Return all sessions
+        } else {
+          query.sessionId = parameter;
+        }
+      } else if (uri.startsWith("chats://")) {
+        if (parameter === "all") {
+          // Return all chats
+        } else {
+          query.type = parameter;
+        }
+      }
+    }
+
+    logger.debug(`[GET_RESOURCE] Executing query: ${JSON.stringify(query)}`);
+
+    // Execute query
+    const result = await collection
+      .find(query)
+      .limit(options.limit || 20)
+      .toArray();
+
+    logger.debug(`[GET_RESOURCE] Found ${result.length} items for URI: ${uri}`);
+    return result;
+  } catch (error) {
+    logger.error(
+      `[GET_RESOURCE] Error getting resource for URI ${uri}:`,
+      error
+    );
+    throw error;
+  }
+}
+
+/**
+ * Format resource content for MCP response
+ */
+export function formatResourceContent(
+  docs: any[],
+  uri: string
+): { contents: Array<{ uri: string; text: string }> } {
+  // Handle empty results explicitly
+  if (!docs || docs.length === 0) {
+    return { contents: [] };
+  }
+
+  // Process the documents into a response
+  const contents = docs.map((doc) => {
+    if (!doc) {
+      return {
+        uri: uri,
+        text: "Resource not found",
+      };
+    }
+
+    const formattedText = JSON.stringify(doc, null, 2);
+
+    return {
+      uri: `${uri}#${doc._id}`,
+      text: formattedText,
+    };
+  });
+
+  return { contents };
+}
+
+// Create and export MCP server instance
+export const mcpServer = new McpServer({
+  name: "Chat MCP Server",
+  version: "1.0.0",
+});
+
+// Track registered resources and tools for debugging
+export const registeredResources = new Set<string>();
+export const registeredTools = new Set<string>();
+
+/**
+ * Initialize MCP server with resources and tools
+ */
+export const initializeMcpServer = async (): Promise<void> => {
+  try {
+    // Connect to database
+    await connectDatabase();
+
+    // Register chat sessions resource
+    mcpServer.resource(
+      "sessions",
+      new ResourceTemplate("sessions://{id}", { list: undefined }),
+      async (uri: URL, params: Record<string, any>) => {
+        logger.info(
+          `[RESOURCE] Handling chat session resource request: ${uri.href}`
+        );
+        const docs = await getResource(uri.href);
+        return formatResourceContent(docs, uri.href);
+      }
+    );
+    registeredResources.add("sessions");
+
+    // Register chat history resource
+    mcpServer.resource(
+      "chats",
+      new ResourceTemplate("chats://{type}", { list: undefined }),
+      async (uri: URL, params: Record<string, any>) => {
+        logger.info(
+          `[RESOURCE] Handling chat history resource request: ${uri.href}`
+        );
+        const docs = await getResource(uri.href);
+        return formatResourceContent(docs, uri.href);
+      }
+    );
+    
+    // Register persona parameters resource (for orchestrator compatibility)
+    mcpServer.resource(
+      "persona",
+      new ResourceTemplate("persona://{type}", { list: undefined }),
+      async (uri: URL, params: Record<string, any>) => {
+        logger.info("[RESOURCE] Handling persona resource request: " + uri.href);
+        
+        // Return default persona configuration
+        const defaultPersona = {
+          name: "Assistant",
+          personality: {
+            confidence: 0.7,
+            sarcasm: 0.2,
+            charm: 0.8,
+            morality: 0.9
+          },
+          systemPrompt: "You are a helpful AI assistant. Respond to the user in a friendly and helpful manner."
+        };
+        
+        return {
+          contents: [{
+            uri: uri.href,
+            text: JSON.stringify(defaultPersona, null, 2)
+          }]
+        };
+      }
+    );
+    registeredResources.add("persona");
+
+    // Register policies resource (for orchestrator compatibility)
+    mcpServer.resource(
+      "policies",
+      new ResourceTemplate("policies://{type}", { list: undefined }),
+      async (uri: URL, params: Record<string, any>) => {
+        logger.info("[RESOURCE] Handling policies resource request: " + uri.href);
+        
+        // Return default policies
+        const defaultPolicies = {
+          maxMessageLength: 4000,
+          allowedTopics: ["general", "assistance", "information"],
+          restrictions: []
+        };
+        
+        return {
+          contents: [{
+            uri: uri.href,
+            text: JSON.stringify(defaultPolicies, null, 2)
+          }]
+        };
+      }
+    );
+    registeredResources.add("policies");
+
+    registeredResources.add("chats");
+
+    // Register search tool
+    mcpServer.tool(
+      "search",
+      {
+        query: z.string().describe("The search query"),
+        collection: z
+          .enum(["sessions", "chats"])
+          .describe("The collection to search in"),
+        limit: z
+          .number()
+          .optional()
+          .describe("Maximum number of results to return"),
+      },
+      async (args: {
+        query: string;
+        collection: "sessions" | "chats";
+        limit?: number;
+      }) => {
+        const { query, collection, limit = 10 } = args;
+        logger.info(`[TOOL] Searching ${collection} for: ${query}`);
+        let collectionName = "";
+        if (collection === "sessions") {
+          collectionName = "chatsessions";
+        } else if (collection === "chats") {
+          collectionName = "chathistories";
+        }
+        const results = await searchCollection(collectionName, query, {
+          limit,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+        };
+      }
+    );
+    registeredTools.add("search");
+
+    // Register persona generator tool
+    mcpServer.tool(
+      "generatePersona",
+      {
+        evmAddress: z
+          .string()
+          .describe(
+            "The user's EVM address for persona generation and storage"
+          ),
+      },
+      async (args: { evmAddress: string }) => {
+        const { evmAddress } = args;
+        logger.info(`[TOOL] Generating persona for EVM address: ${evmAddress}`);
+
+        try {
+          // Check if user already has a pending persona
+          const existingPersona = await getPersonaFromCache(evmAddress);
+          if (existingPersona) {
+            const rerollInfo = await getRerollCount(evmAddress);
+            logger.info(
+              `Found existing persona for ${evmAddress}: ${existingPersona.name}`
+            );
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      success: true,
+                      message: "Retrieved existing persona",
+                      rerollsRemaining: rerollInfo.rerollsRemaining,
+                      persona: {
+                        name: existingPersona.name,
+                        gender: existingPersona.gender,
+                        confidence: existingPersona.confidence,
+                        sarcasm: existingPersona.sarcasm,
+                        charm: existingPersona.charm,
+                        morality: existingPersona.morality,
+                        appearance: existingPersona.appearance,
+                        region: existingPersona.region,
+                        education: existingPersona.education,
+                        accessory: existingPersona.accessory,
+                        systemPrompt: existingPersona.systemPrompt,
+                      },
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
+          // Generate new persona
+          const persona = await generatePersona(evmAddress);
+
+          // Store in cache
+          const cacheId = await storePersonaInCache(evmAddress, persona);
+
+          logger.info(
+            `Generated and cached persona ${persona.name} for ${evmAddress}`
+          );
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "Generated new persona",
+                    cacheId,
+                    rerollsRemaining: 3,
+                    persona: {
+                      name: persona.name,
+                      gender: persona.gender,
+                      confidence: persona.confidence,
+                      sarcasm: persona.sarcasm,
+                      charm: persona.charm,
+                      morality: persona.morality,
+                      appearance: persona.appearance,
+                      region: persona.region,
+                      education: persona.education,
+                      accessory: persona.accessory,
+                      systemPrompt: persona.systemPrompt,
+                    },
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        } catch (error) {
+          logger.error(`Error generating persona for ${evmAddress}:`, error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+      }
+    );
+    registeredTools.add("generatePersona");
+
+    // Register persona reroll tool
+    mcpServer.tool(
+      "rerollPersona",
+      {
+        evmAddress: z
+          .string()
+          .describe("The user's EVM address for persona reroll"),
+      },
+      async (args: { evmAddress: string }) => {
+        const { evmAddress } = args;
+        logger.info(`[TOOL] Rerolling persona for EVM address: ${evmAddress}`);
+
+        try {
+          const result = await rerollPersona(evmAddress);
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: true,
+                    message: "Persona rerolled successfully",
+                    rerollsRemaining: result.rerollsRemaining,
+                    persona: {
+                      name: result.persona.name,
+                      gender: result.persona.gender,
+                      confidence: result.persona.confidence,
+                      sarcasm: result.persona.sarcasm,
+                      charm: result.persona.charm,
+                      morality: result.persona.morality,
+                      appearance: result.persona.appearance,
+                      region: result.persona.region,
+                      education: result.persona.education,
+                      accessory: result.persona.accessory,
+                      systemPrompt: result.persona.systemPrompt,
+                    },
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        } catch (error) {
+          logger.error(`Error rerolling persona for ${evmAddress}:`, error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify(
+                  {
+                    success: false,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                  null,
+                  2
+                ),
+              },
+            ],
+          };
+        }
+      }
+    );
+    registeredTools.add("rerollPersona");
+
+    logger.info("MCP Server initialized successfully");
+  } catch (error) {
+    logger.error("Failed to initialize MCP Server:", error);
+    throw error;
+  }
+};
+
+// Plugins registry
+const plugins: Record<string, any> = {};
+
+/**
+ * Register a plugin
+ */
+export const registerPlugin = (name: string, plugin: any): void => {
+  if (plugins[name]) {
+    throw new Error(`Plugin with name ${name} already registered`);
+  }
+
+  plugins[name] = plugin;
+  logger.info(`Plugin ${name} registered`);
+
+  // Call onLoad lifecycle method if it exists
+  if (typeof plugin.onLoad === "function") {
+    try {
+      plugin.onLoad(mcpServer);
+      logger.info(`Plugin ${name} loaded`);
+    } catch (error) {
+      logger.error(`Error loading plugin ${name}:`, error);
+      if (typeof plugin.onError === "function") {
+        plugin.onError(error);
+      }
+    }
+  }
+};
+
+/**
+ * Unregister a plugin
+ */
+export const unregisterPlugin = (name: string): void => {
+  const plugin = plugins[name];
+  if (!plugin) {
+    logger.warn(`Plugin ${name} not found, cannot unregister`);
+    return;
+  }
+
+  // Call onUnload lifecycle method if it exists
+  if (typeof plugin.onUnload === "function") {
+    try {
+      plugin.onUnload(mcpServer);
+      logger.info(`Plugin ${name} unloaded`);
+    } catch (error) {
+      logger.error(`Error unloading plugin ${name}:`, error);
+      if (typeof plugin.onError === "function") {
+        plugin.onError(error);
+      }
+    }
+  }
+
+  delete plugins[name];
+  logger.info(`Plugin ${name} unregistered`);
+};
+
+/**
+ * Get a plugin by name
+ */
+export const getPlugin = (name: string): any => {
+  return plugins[name];
+};
+
+/**
+ * List all registered plugins
+ */
+export const listPlugins = (): string[] => {
+  return Object.keys(plugins);
+};
