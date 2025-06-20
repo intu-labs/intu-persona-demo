@@ -1,89 +1,189 @@
 # INTU Persona Demo
 
-> **Project Status (2025-05-29):**
->
-> - **MCP server is running on port 3000, fully connected to MongoDB (persona-demo) and integrated with orchestrator.**
-> - **MCP Client Fixed**: TypeScript SDK now uses correct high-level methods (client.listResources(), client.listTools(), etc.)
-> - **MCP Resource Discovery**: ✅ **RESOLVED** - All 5 resources now discoverable in 3ms (personas, sessions, chats, expertise, nftCache)
-> - **Database Seeded**: MongoDB populated with neutral personas and 52 comprehensive INTU expertise entries
-> - **Connection**: Orchestrator connects instantly to MCP server with full resource and tool support
-> - **Persona Generator Tool is complete and operational** - random generation, LLM integration, duplicate prevention, reroll system (3 max), NFT cache storage.
-> - **INTU Expertise Database is complete** - 52 comprehensive entries covering all INTU features, specifications, and technical details.
-> - Orchestrator successfully connects to MCP server with full tool support for persona generation.
-> - UI/UX documentation, v0.dev prompt, and frontend scaffold (Zustand, no persistence) complete.
-> - UI chat is wired to orchestrator via /api/chat proxy route.
-> - **Next: End-to-end workflow testing, then Image Generator Tool (ComfyUI integration)** - proxy routes will be added as remaining MCP tools are implemented.
+> **Where AI Meets Web3: Create, Own, and Interact with Your Digital Persona**
 
-This is a demo PWA for INTU's unified execution layer, combining AI and blockchain. Users create, own, and interact with unique AI Agent personas as NFTs, with secure, compliant, and seamless operations. The UI is fully migrated to Zustand (no state persistence for privacy) and is ready for backend (MCP) integration.
+INTU Persona Demo showcases the seamless integration of AI and blockchain technology, enabling users to create unique AI-powered personas as NFTs that live on the blockchain while providing intelligent conversational experiences.
 
-> **Reference:**
->
-> - [Project Plan](ref/project.md)
-> - [Product Requirements Document (PRD)](ref/prd.md)
+## 🚀 What You Can Do
 
-## Setup (Local Dev) And RUN!
+### 🔐 **Seamless Authentication**
+- **Single Sign-On (SSO)**: Login with your preferred provider
+- **Automatic EVM Account**: Get a blockchain account created automatically
+- **Secure & Compliant**: Built with INTU's unified execution layer
 
-1. Clone repo
-2. Install dependencies (pnpm recommended)
-3. `docker compose up -d`
-4. **Infrastructure running:** `docker ps` to verify MongoDB, MinIO, Ollama containers
-5. **MCP Server:** `cd mcp-server && pnpm i && pnpm run build && pnpm start` (runs on port 3000)
-6. **Orchestrator:** `cd orchestrator && pnpm i && pnpm run dev` Configure and run orchestrator (connects to MCP)
-7. **Frontend:** `cd ui && pnpm i && pnpm build && pnpm dev`
-8. Configure env vars for endpoints, keys, etc.
+### 🎭 **Create Your Digital Persona**
+- **AI-Generated Personalities**: Create unique personas with distinct traits, appearances, and characteristics
+- **NFT Ownership**: Your persona becomes an NFT on Arbitrum Sepolia, permanently owned by your account
+- **Customizable Traits**: Gender, appearance, region, personality traits (confidence, sarcasm, charm, morality)
+- **Smart Reroll System**: Don't like your persona? Reroll up to 3 times to get the perfect match
 
-## Features
+### 💬 **Intelligent Chat Experience**
+- **AI-Powered Conversations**: Chat with your persona using advanced AI models (Ollama local, OpenAI)
+- **Contextual Understanding**: Your persona remembers conversations and maintains consistent personality
+- **Real-time Responses**: Fast, responsive chat interface with streaming support
 
-- Unified SSO login (INTU)
-- AI Agent chat (Ollama, local, OpenAI)
-- **Persona generator** (complete with LLM name/accessory generation, reroll system)
-- Persona image generator (ComfyUI, local) -
-- NFT minting (custom ERC-721, Arbitrum Sepolia, IPFS)
-- Data privacy/encryption (INTU)
-- PWA/mobile-first UI (Next.js, Vite, TailwindCSS)
-- **Frontend fully migrated to Zustand (no persistence), integrated with MCP backend**
+### 💰 **Blockchain Transactions in Chat**
+- **Direct Transaction Capability**: Send blockchain transactions directly from the chat interface
+- **EVM Integration**: Full Ethereum Virtual Machine compatibility
+- **Secure Execution**: All transactions processed through INTU's secure infrastructure
 
-## Current Status (2025-05-29)
+## 🏗️ Architecture
 
-### ✅ **Working Components:**
+This demo is built with three core components:
 
-- **Infrastructure Services**: MongoDB, MinIO, Ollama, ComfyUI containers running
-- **MCP Tools**: 4 tools available and functional (search, generatePersona, rerollPersona, generateProfileImage)
-- **MCP Resources**: 5 resources available and discoverable in 3ms (personas, sessions, chats, expertise, nftCache)
-- **Database**: Seeded with neutral personas (Dr. Indigo Bridge, etc.) and 52 INTU expertise entries
-- **MCP Client**: Fixed to use correct TypeScript SDK high-level methods
-- **Connection**: Orchestrator successfully connects to MCP server with instant resource discovery
+### 📡 [MCP Server](./mcp-server/)
+**The Data & AI Hub**
+- Model Context Protocol (MCP) compliant server
+- Manages persona generation, chat sessions, and NFT metadata
+- Integrates with MongoDB for data persistence
+- Provides AI-powered persona creation with LLM integration
+- Handles image generation via RunPod/ComfyUI
+- IPFS integration for decentralized storage
 
+### 🎼 [Orchestrator](./orchestrator/)
+**The Intelligence Layer**
+- Coordinates between UI, MCP server, and AI providers
+- Manages conversation flow and context
+- Supports multiple LLM providers (Ollama, OpenAI, Anthropic)
+- Handles session management and real-time communication
+- Provides RESTful API for frontend integration
 
+### 🎨 Frontend UI
+**The User Experience**
+- Modern PWA built with Next.js, Vite, and TailwindCSS
+- Mobile-first responsive design
+- Real-time chat interface with streaming responses
+- Zustand state management (privacy-focused, no persistence)
+- Integrated wallet functionality for blockchain interactions
 
-### 📊 **System Status:**
+## 🛠️ Tech Stack
 
-```
-✅ MCP Tools:     4/4 working (search, generatePersona, rerollPersona, generateProfileImage)
-✅ MCP Resources: 5/5 working (personas, sessions, chats, expertise, nftCache) - 3ms discovery
-✅ Infrastructure: 4/4 services running (MongoDB, MinIO, Ollama, ComfyUI)
-✅ Database:      Seeded with personas and expertise data
-✅ Connection:    Orchestrator ↔ MCP Server connected (instant, no hanging)
-✅ Discovery:     All resources discoverable via listResources() endpoint
-```
-
-## Tech Stack
-
+**Frontend**
 - Next.js, Vite, TailwindCSS
-- Zustand
-- Ollama (Gemma3)
-- ComfyUI
-- **MCP Server/Client/Orchestrator (tools working, debugging resources)**
-- Ethers v5
-- INTU SDK
-- MinIO, IPFS
-- Firebase SSO (basic analytics)
+- Zustand for state management
+- TypeScript for type safety
 
+**Backend**
+- Node.js with TypeScript
+- Model Context Protocol (MCP)
+- MongoDB for data persistence
+- MinIO for object storage
 
+**AI & Image Generation**
+- Ollama (Gemma3) for local AI
+- OpenAI API support
+- RunPod/ComfyUI for image generation
+- IPFS for decentralized storage
 
+**Blockchain**
+- Ethers.js v5 for Ethereum interaction
+- INTU SDK for unified execution
+- Arbitrum Sepolia testnet
+- Custom ERC-721 for persona NFTs
 
-## Server stuff
-after running the start script, if you need to make an update you gotta kill processes
+## 🚀 Quick Start
 
- sudo lsof -i -P -n
-kill xxxxxxx
+### Prerequisites
+- Node.js (v20+ recommended)
+- Docker and Docker Compose
+- MongoDB
+- (Optional) Ollama for local AI
+
+### Installation
+
+1. **Clone and Install**
+   ```bash
+   git clone https://github.com/intu-labs/intu-persona-demo.git
+   cd intu-persona-demo
+   pnpm install  # or npm install
+   ```
+
+2. **Start Infrastructure**
+   ```bash
+   docker compose up -d
+   # Starts MongoDB, MinIO, Ollama containers
+   ```
+
+3. **Configure Environment**
+   ```bash
+   # Configure MCP Server
+   cd mcp-server
+   cp env.example .env
+   # Edit .env with your API keys and settings
+   
+   # Configure Orchestrator
+   cd ../orchestrator
+   cp env.example .env
+   # Edit .env for your LLM provider settings
+   ```
+
+4. **Start Services**
+   ```bash
+   # Terminal 1: MCP Server
+   cd mcp-server
+   pnpm run build && pnpm start
+   
+   # Terminal 2: Orchestrator
+   cd orchestrator
+   pnpm run dev
+   
+   # Terminal 3: Frontend
+   cd ui
+   pnpm run dev
+   ```
+
+5. **Access the Demo**
+   - Frontend: http://localhost:5173
+   - Orchestrator API: http://localhost:3005
+   - MCP Server: http://localhost:3000
+
+## 🔧 Configuration
+
+### Environment Variables
+
+**MCP Server (.env)**
+```bash
+MONGODB_URI=mongodb://localhost:27017/persona-demo
+RUNPOD_API_KEY=your_runpod_key_here
+OPENAI_API_KEY=your_openai_key_here
+PINATA_JWT=your_pinata_jwt_here
+```
+
+**Orchestrator (.env)**
+```bash
+MCP_SERVER_URL=http://localhost:3000
+OPENAI_API_KEY=your_openai_key_here
+OLLAMA_HOST=http://localhost:11434
+```
+
+## 🎯 Use Cases
+
+- **Digital Identity**: Create persistent AI personas that represent you across applications
+- **NFT Collections**: Build collections of unique AI-generated characters
+- **Conversational AI**: Interact with personalized AI agents that maintain consistent personalities
+- **Web3 Integration**: Demonstrate seamless blockchain integration in AI applications
+- **Developer Showcase**: Exhibit Model Context Protocol (MCP) capabilities
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our contributing guidelines and feel free to submit issues or pull requests.
+
+## 📖 Documentation
+
+- [MCP Server Documentation](./mcp-server/README.md)
+- [Orchestrator Documentation](./orchestrator/README.md)
+- [INTU Documentation](https://docs.intu.com) _(coming soon)_
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🔗 Links
+
+- [INTU Website](https://intu.com)
+- [INTU Labs](https://intu-labs.com)
+- [Model Context Protocol](https://modelcontextprotocol.io)
+
+---
+
+**Built with ❤️ by the INTU team**

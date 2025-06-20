@@ -232,21 +232,21 @@ export const useAppStore = create<AppState>()(
     {
       name: "intu-app-storage",
       // Exclude sensitive/user-specific data from persistence
-      partialize: (state: AppState) => {
-        const {
-          isSidebarOpen,
-          isLoggedIn,
-          isDataConnected,
-          intuVaults,
-          currentVault,
-          currentVaultEoa,
-          persona,
-          messages,
-          ...persistedState
-        } = state;
-        // Only persist non-sensitive, non-session-specific state
-        return persistedState;
-      },
+      //partialize: (state: AppState) => {
+      //  const {
+      //    isSidebarOpen,
+      //    isLoggedIn,
+      //    isDataConnected,
+      //    intuVaults,
+      //    currentVault,
+      //    currentVaultEoa,
+      //    persona,
+      //    messages,
+      //    ...persistedState
+      //  } = state;
+      //  // Only persist non-sensitive, non-session-specific state
+      //  return persistedState;
+      //},
     }
   )
 );

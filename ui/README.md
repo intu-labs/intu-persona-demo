@@ -1,616 +1,428 @@
-# INTU Persona Demo
+# UI - Modern Web3 Experience
 
-A mobile-first, chat-centric Progressive Web Application (PWA) that allows users to create, own, and interact with unique AI Agent personas.
+> **Beautiful, responsive interface for AI-powered personas and blockchain interactions**
 
-## Table of Contents
+The UI component is the user-facing frontend of INTU Persona Demo. Built as a modern Progressive Web App (PWA), it provides an intuitive interface for creating AI personas, chatting with intelligent agents, and executing blockchain transactions seamlessly.
 
-- [Overview](#overview)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Installation](#installation)
-- [Export Instructions](#export-instructions)
-- [Integration with Backend](#integration-with-backend)
-- [State Management](#state-management)
-- [Theming and Styling](#theming-and-styling)
-- [Components](#components)
-- [Hooks](#hooks)
-- [Customization](#customization)
-- [PWA Configuration](#pwa-configuration)
-- [Dependencies](#dependencies)
-- [Additional Export Considerations](#additional-export-considerations)
-- [Troubleshooting](#troubleshooting)
+## 🎯 What It Offers
 
-## Overview
+### 🎨 **Modern User Experience**
+- **Progressive Web App**: Full PWA capabilities with offline support
+- **Mobile-First Design**: Responsive layout optimized for all devices
+- **Real-Time Chat**: Streaming AI responses with smooth animations
+- **Dark/Light Mode**: Adaptive theming for user preference
 
-INTU Persona Demo is a Next.js application that showcases a modern UI for interacting with AI personas. The application features a chat interface, persona management, and data connection capabilities. It's designed to be mobile-first and responsive, with a focus on micro-interactions and a clean, modern aesthetic.
+### 🔐 **Seamless Authentication**
+- **SSO Integration**: Single sign-on with popular providers
+- **Wallet Connection**: Automatic EVM account creation
+- **Session Management**: Secure, privacy-focused state handling
+- **No Data Persistence**: Privacy-first approach with no local storage
 
-## Features
+### 🎭 **Persona Management**
+- **Interactive Creation**: Guided persona generation workflow
+- **Visual Feedback**: Real-time preview of persona traits
+- **Reroll System**: Easy persona regeneration (up to 3 times)
+- **NFT Visualization**: Beautiful display of persona as NFT
 
-- **Chat Interface**: Real-time chat with AI personas
-- **Persona Management**: Create, customize, and reroll AI personas
-- **Authentication**: Login with various providers
-- **Data Connection**: Connect private data sources
-- **Theme Support**: Light/dark mode and persona-specific themes
-- **Progressive Web App**: Installable on mobile devices
-- **Responsive Design**: Mobile-first approach with desktop support
+### 💬 **Intelligent Chat Interface**
+- **Contextual Conversations**: AI remembers your persona and preferences
+- **Streaming Responses**: Real-time message delivery
+- **Rich Content**: Support for text, images, and interactive elements
+- **Transaction Integration**: Execute blockchain transactions directly in chat
 
-## Project Structure
+## 🛠️ Tech Stack
 
-\`\`\`
-intu-persona-demo/
-├── app/                    # Next.js App Router files
-│   ├── globals.css         # Global styles
-│   ├── layout.tsx          # Root layout
-│   ├── manifest.ts         # PWA manifest
-│   └── page.tsx            # Home page
-├── components/             # React components
-│   ├── auth/               # Authentication components
-│   ├── chat/               # Chat interface components
-│   ├── data/               # Data connection components
-│   ├── layouts/            # Layout components
-│   ├── persona/            # Persona management components
-│   ├── providers/          # Context providers
-│   ├── settings/           # Settings components
-│   └── ui/                 # UI components (shadcn/ui)
-├── hooks/                  # Custom React hooks
-├── lib/                    # Utility functions
-├── public/                 # Static assets
-├── tailwind.config.ts      # Tailwind configuration
-└── next.config.mjs         # Next.js configuration
-\`\`\`
+**Framework & Build**
+- **Vite**: Lightning-fast build tool and dev server
+- **React 18**: Modern React with concurrent features
+- **TypeScript**: Full type safety throughout the application
 
-## Installation
+**Styling & UI**
+- **Tailwind CSS**: Utility-first CSS framework
+- **Shadcn/ui**: Beautiful, accessible UI components
+- **Lucide Icons**: Consistent iconography
+- **CSS Variables**: Dynamic theming support
 
-1. **Clone the repository**
+**State Management**
+- **Zustand**: Lightweight, intuitive state management
+- **No Persistence**: Privacy-focused approach
+- **Reactive Updates**: Efficient re-rendering
 
-\`\`\`bash
-git clone <repository-url>
-cd intu-persona-demo
-\`\`\`
+**Web3 Integration**
+- **Ethers.js**: Ethereum blockchain interaction
+- **INTU SDK**: Unified execution layer
+- **Wallet Connect**: Multi-wallet support
 
-2. **Install dependencies**
+## 🚀 Quick Start
 
-\`\`\`bash
-npm install
-# or
-yarn install
-# or
-pnpm install
-\`\`\`
+### Prerequisites
+- Node.js (v20+ recommended)
+- Running Orchestrator (for API endpoints)
+- Modern web browser
 
-3. **Run the development server**
+### Installation
 
-\`\`\`bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-\`\`\`
+```bash
+# Clone the main repository
+git clone https://github.com/intu-labs/intu-persona-demo.git
+cd intu-persona-demo/ui
 
-4. **Open [http://localhost:3000](http://localhost:3000) in your browser**
+# Install dependencies
+pnpm install  # or npm install
+```
 
-## Export Instructions
+### Development
 
-### Using v0.dev's Download Code Feature
+```bash
+# Start development server
+pnpm run dev
 
-The easiest way to export this project is using v0.dev's built-in download feature:
+# Access the application
+# http://localhost:5173
+```
 
-1. **Click the "Download Code" button** in the top-right corner of the v0.dev interface
-2. **Select your preferred download option**:
-   - Download as ZIP
-   - Copy installation command
+### Production Build
 
-3. **Using the shadcn CLI command**:
+```bash
+# Build for production
+pnpm run build
 
-\`\`\`bash
-# Create a new Next.js project if you don't have one
-npx create-next-app@latest my-intu-app
-cd my-intu-app
+# Preview production build
+pnpm run preview
 
-# Install the INTU Persona Demo using the shadcn CLI
-npx shadcn@latest add "https://v0.dev/chat/b/b_2W6jie1rrU0"
-\`\`\`
+# Serve static files
+pnpm run serve
+```
 
-This command will:
-- Install all necessary dependencies
-- Add all components to your project
-- Configure Tailwind CSS
-- Set up the required files and structure
+## 🏗️ Project Structure
 
-4. **After installation, check that all files were properly added**:
-   - Verify that `app/globals.css` contains all the CSS variables
-   - Ensure `tailwind.config.ts` has all the required theme extensions
-   - Check that all components are in the `components` directory
+```
+ui/
+├── src/
+│   ├── components/          # Reusable UI components
+│   │   ├── chat/           # Chat interface components
+│   │   ├── ui/             # Shadcn/ui components
+│   │   ├── layouts/        # Layout components
+│   │   └── providers/      # Context providers
+│   ├── lib/                # Utility functions and configs
+│   │   ├── store.ts        # Zustand store configuration
+│   │   ├── utils.ts        # General utilities
+│   │   └── constants.ts    # App constants
+│   ├── assets/             # Static assets
+│   ├── App.tsx             # Main app component
+│   └── main.tsx            # Application entry point
+├── public/                 # Static files
+├── index.html              # HTML template
+└── vite.config.ts          # Vite configuration
+```
 
-5. **Start the development server**:
+## ⚙️ Configuration
 
-\`\`\`bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-\`\`\`
+### Environment Variables
 
-### Manual Export
+Create a `.env.local` file in the ui directory:
 
-If you prefer to manually export the code:
+```bash
+# API Endpoints
+VITE_ORCHESTRATOR_URL=http://localhost:3005
+VITE_MCP_SERVER_URL=http://localhost:3000
 
-1. **Download the ZIP file** from v0.dev
-2. **Extract the files** to your project directory
-3. **Install the required dependencies**:
+# Blockchain Configuration
+VITE_CHAIN_ID=421614
+VITE_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
 
-\`\`\`bash
-npm install next react react-dom tailwindcss postcss autoprefixer tailwindcss-animate lucide-react next-themes react-markdown
-# or
-yarn add next react react-dom tailwindcss postcss autoprefixer tailwindcss-animate lucide-react next-themes react-markdown
-# or
-pnpm add next react react-dom tailwindcss postcss autoprefixer tailwindcss-animate lucide-react next-themes react-markdown
-\`\`\`
+# Feature Flags
+VITE_ENABLE_WALLET=true
+VITE_ENABLE_TRANSACTIONS=true
+VITE_DEBUG_MODE=false
+```
 
-4. **Copy the files** to your project structure
-5. **Configure Tailwind CSS**:
+### Theming
 
-\`\`\`bash
-npx tailwindcss init -p
-\`\`\`
+The app supports custom theming through CSS variables:
 
-6. **Replace the generated `tailwind.config.js` with the provided `tailwind.config.ts`**
-
-## Integration with Backend
-
-### API Integration
-
-The current implementation uses simulated responses. To integrate with a real backend:
-
-1. **Update the `AppProvider` in `components/providers/app-provider.tsx`**:
-   - Replace the simulated persona generation with API calls
-   - Update the message handling to use your backend API
-
-2. **Implement Authentication**:
-   - Update the `LoginModal` component to use your authentication service
-   - Modify the `useApp` hook to handle authentication tokens
-
-3. **Connect Data Sources**:
-   - Update the `ConnectDataModal` component to connect to your data sources
-   - Implement proper data fetching and storage
-
-### Example API Integration
-
-\`\`\`typescript
-// Example API call for persona generation
-const rerollPersona = async () => {
-  if (!persona || persona.rerollsLeft <= 0) return
-
-  try {
-    // Replace with your API endpoint
-    const response = await fetch('/api/personas/reroll', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: user.id,
-        currentPersonaId: persona.id,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error('Failed to reroll persona')
-    }
-
-    const newPersona = await response.json()
-    setPersona(newPersona)
-  } catch (error) {
-    console.error('Error rerolling persona:', error)
-    throw error
-  }
+```css
+/* Custom theme in src/index.css */
+:root {
+  --primary: 222.2 84% 4.9%;
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  /* ... more theme variables */
 }
-\`\`\`
+```
 
-### Chat Integration
+## 🧩 Key Components
 
-To integrate with a real AI backend:
+### Chat Interface
+```typescript
+// components/chat/chat-interface.tsx
+import { ChatInterface } from '@/components/chat/chat-interface';
 
-1. **Update the `handleSendMessage` function in `ChatInterface`**:
+<ChatInterface 
+  sessionId="user-123"
+  onMessage={handleMessage}
+  streaming={true}
+/>
+```
 
-\`\`\`typescript
-const handleSendMessage = async (content: string) => {
-  if (!content.trim()) return
+### Persona Display
+```typescript
+// Display user's persona
+import { PersonaCard } from '@/components/persona-card';
 
-  // Add user message
-  const userMessage = {
-    id: Date.now().toString(),
-    content,
-    sender: "user",
-    timestamp: new Date(),
-  }
-  addMessage(userMessage)
+<PersonaCard 
+  persona={userPersona}
+  onReroll={handleReroll}
+  rerollsRemaining={3}
+/>
+```
 
-  try {
-    // Call your AI backend
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message: content,
-        personaId: persona?.id,
-        userId: user.id,
-      }),
-    })
+### Wallet Connection
+```typescript
+// components/wallet-connect.tsx
+import { WalletConnect } from '@/components/wallet-connect';
 
-    if (!response.ok) {
-      throw new Error('Failed to get response')
-    }
+<WalletConnect 
+  onConnect={handleWalletConnect}
+  supportedChains={[arbitrumSepolia]}
+/>
+```
 
-    const aiResponse = await response.json()
-    
-    addMessage({
-      id: Date.now().toString(),
-      content: aiResponse.text,
-      sender: "agent",
-      timestamp: new Date(),
-      isMarkdown: aiResponse.isMarkdown || false,
-    })
-  } catch (error) {
-    console.error('Error getting AI response:', error)
-    addMessage({
-      id: Date.now().toString(),
-      content: "Sorry, I encountered an error. Please try again.",
-      sender: "agent",
-      timestamp: new Date(),
-    })
-  }
-}
-\`\`\`
+## 🔗 API Integration
 
-## State Management
+### Orchestrator Communication
+```typescript
+// lib/api.ts
+export const sendMessage = async (sessionId: string, message: string) => {
+  const response = await fetch(`${ORCHESTRATOR_URL}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sessionId, message })
+  });
+  return response.json();
+};
+```
 
-The application uses React Context for state management. For larger applications, you might want to migrate to Zustand:
-
-### Migrating to Zustand
-
-1. **Install Zustand**:
-
-\`\`\`bash
-npm install zustand
-# or
-yarn add zustand
-# or
-pnpm add zustand
-\`\`\`
-
-2. **Create a store**:
-
-\`\`\`typescript
-// store/app-store.ts
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-
-type PersonaTheme = "default" | "bohemian" | "alien" | "militant" | "fashionable"
-
-type Persona = {
-  id: string
-  name: string
-  description: string
-  theme: PersonaTheme
-  imageUrl: string
-  backgroundUrl: string
-  rerollsLeft: number
-}
-
-type Message = {
-  id: string
-  content: string
-  sender: "user" | "agent"
-  timestamp: Date
-  isMarkdown?: boolean
-}
+### State Management
+```typescript
+// lib/store.ts
+import { create } from 'zustand';
 
 interface AppState {
-  isLoggedIn: boolean
-  isDataConnected: boolean
-  isSidebarOpen: boolean
-  persona: Persona | null
-  messages: Message[]
-  setLoggedIn: (value: boolean) => void
-  setDataConnected: (value: boolean) => void
-  setSidebarOpen: (value: boolean) => void
-  setPersona: (persona: Persona | null) => void
-  addMessage: (message: Message) => void
-  clearMessages: () => void
-  rerollPersona: () => Promise<void>
+  user: User | null;
+  persona: Persona | null;
+  chatHistory: Message[];
+  setUser: (user: User) => void;
+  setPersona: (persona: Persona) => void;
+  addMessage: (message: Message) => void;
 }
 
-export const useAppStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      isLoggedIn: false,
-      isDataConnected: false,
-      isSidebarOpen: true,
-      persona: null,
-      messages: [],
-      setLoggedIn: (value) => set({ isLoggedIn: value }),
-      setDataConnected: (value) => set({ isDataConnected: value }),
-      setSidebarOpen: (value) => set({ isSidebarOpen: value }),
-      setPersona: (persona) => set({ persona }),
-      addMessage: (message) => set((state) => ({ messages: [...state.messages, message] })),
-      clearMessages: () => set({ messages: [] }),
-      rerollPersona: async () => {
-        const { persona } = get()
-        if (!persona || persona.rerollsLeft <= 0) return
+export const useAppStore = create<AppState>((set) => ({
+  user: null,
+  persona: null,
+  chatHistory: [],
+  setUser: (user) => set({ user }),
+  setPersona: (persona) => set({ persona }),
+  addMessage: (message) => set((state) => ({
+    chatHistory: [...state.chatHistory, message]
+  })),
+}));
+```
 
-        // Simulate API call
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+## 🎨 Styling Guidelines
 
-        const themes: PersonaTheme[] = ["bohemian", "alien", "militant", "fashionable"]
-        const randomTheme = themes[Math.floor(Math.random() * themes.length)]
+### Component Styling
+- Use Tailwind CSS classes for consistent styling
+- Leverage CSS variables for theme-aware colors
+- Follow mobile-first responsive design principles
 
-        const names = ["Zephyr", "Nova", "Atlas", "Echo", "Orion", "Luna", "Sage", "Iris"]
-        const randomName = names[Math.floor(Math.random() * names.length)]
+### Color Scheme
+```css
+/* Primary colors */
+.bg-primary     /* Main brand color */
+.bg-secondary   /* Secondary brand color */
+.bg-accent      /* Accent color for highlights */
+.bg-muted       /* Subtle backgrounds */
 
-        set({
-          persona: {
-            ...persona,
-            name: randomName,
-            theme: randomTheme,
-            rerollsLeft: persona.rerollsLeft - 1,
-            imageUrl: `/placeholder.svg?height=400&width=400&text=${randomName}`,
-          }
-        })
+/* Semantic colors */
+.text-destructive  /* Error states */
+.text-success      /* Success states */
+.text-warning      /* Warning states */
+```
+
+### Component Variants
+```typescript
+// Using cva for component variants
+import { cva } from 'class-variance-authority';
+
+const buttonVariants = cva(
+  'inline-flex items-center justify-center rounded-md font-medium',
+  {
+    variants: {
+      variant: {
+        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+        outline: 'border border-input bg-background hover:bg-accent',
       },
-    }),
-    {
-      name: 'intu-app-storage',
-    }
-  )
-)
-\`\`\`
+      size: {
+        default: 'h-10 px-4 py-2',
+        sm: 'h-9 rounded-md px-3',
+        lg: 'h-11 rounded-md px-8',
+      },
+    },
+  }
+);
+```
 
-3. **Replace Context usage with Zustand**:
+## 🚀 Performance Optimizations
 
-\`\`\`typescript
-// In components
-import { useAppStore } from '@/store/app-store'
+### Code Splitting
+```typescript
+// Lazy load components
+import { lazy, Suspense } from 'react';
 
-export function MyComponent() {
-  const { isLoggedIn, setLoggedIn } = useAppStore()
-  
-  // Use the state and actions
-  return (
-    // ...
-  )
-}
-\`\`\`
+const PersonaGenerator = lazy(() => import('./components/PersonaGenerator'));
 
-## Theming and Styling
+// Usage with suspense
+<Suspense fallback={<Loading />}>
+  <PersonaGenerator />
+</Suspense>
+```
 
-### CSS Variables
+### Asset Optimization
+- **Images**: Optimized with proper formats (WebP, AVIF)
+- **Fonts**: Preloaded for better performance
+- **Icons**: Tree-shaken from Lucide React
+- **Bundle**: Analyzed and optimized with Vite
 
-The application uses CSS variables for theming. These are defined in `app/globals.css`. The main themes are:
+### Caching Strategy
+```typescript
+// Service worker for offline support
+// src/sw.ts
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 
-- **Light Mode**: Default light theme
-- **Dark Mode**: Default dark theme
-- **Persona Themes**: Bohemian, Alien, Militant, Fashionable
+precacheAndRoute(self.__WB_MANIFEST);
+cleanupOutdatedCaches();
+```
 
-### Tailwind Configuration
+## 🧪 Testing
 
-The Tailwind configuration is in `tailwind.config.ts`. It includes:
+### Unit Tests
+```bash
+# Run tests
+pnpm run test
 
-- Custom colors based on CSS variables
-- Extended theme properties
-- Animation configurations
+# Run tests with coverage
+pnpm run test:coverage
 
-### Adding New Themes
+# Run tests in watch mode
+pnpm run test:watch
+```
 
-To add a new persona theme:
+### E2E Tests
+```bash
+# Run Playwright tests
+pnpm run test:e2e
 
-1. **Add the theme to the `PersonaTheme` type in `app-provider.tsx`**:
+# Run tests in headed mode
+pnpm run test:e2e:headed
+```
 
-\`\`\`typescript
-type PersonaTheme = "default" | "bohemian" | "alien" | "militant" | "fashionable" | "your-new-theme"
-\`\`\`
+### Component Testing
+```typescript
+// Example component test
+import { render, screen } from '@testing-library/react';
+import { ChatInterface } from './chat-interface';
 
-2. **Add the theme CSS variables in `globals.css`**:
+test('renders chat interface', () => {
+  render(<ChatInterface sessionId="test" />);
+  expect(screen.getByPlaceholderText('Type a message...')).toBeInTheDocument();
+});
+```
 
-\`\`\`css
-/* Persona Theme: Your New Theme */
-.theme-your-new-theme {
-  --background: 200 50% 10%;
-  --foreground: 200 100% 90%;
-  /* Add all required variables */
-}
-\`\`\`
-
-## Components
-
-### Main Components
-
-- **MainLayout**: Main layout wrapper
-- **ChatInterface**: Chat interface container
-- **ChatMessages**: Message display
-- **ChatInput**: Message input
-- **Sidebar**: Side navigation
-- **Header**: Top navigation
-- **PersonaProfile**: Persona display
-- **SettingsPopup**: Settings menu
-- **LoginModal**: Authentication modal
-- **ConnectDataModal**: Data connection modal
-
-### UI Components
-
-The application uses shadcn/ui components. These are imported from `@/components/ui`.
-
-## Hooks
-
-### Custom Hooks
-
-- **useApp**: Access app state
-- **useLocalStorage**: Persist data in localStorage
-- **useMediaQuery**: Responsive design helper
-
-### Adding New Hooks
-
-Example of adding a new hook:
-
-\`\`\`typescript
-// hooks/use-debounce.ts
-import { useState, useEffect } from 'react'
-
-export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value)
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-
-  return debouncedValue
-}
-\`\`\`
-
-## Customization
-
-### Persona Customization
-
-To add more persona customization options:
-
-1. **Expand the `Persona` type in `app-provider.tsx`**:
-
-\`\`\`typescript
-type Persona = {
-  id: string
-  name: string
-  description: string
-  theme: PersonaTheme
-  imageUrl: string
-  backgroundUrl: string
-  rerollsLeft: number
-  // New fields
-  voiceId?: string
-  personality?: string[]
-  knowledge?: string[]
-}
-\`\`\`
-
-2. **Update the UI components to use these new fields**
-
-### UI Customization
-
-To customize the UI:
-
-1. **Update the CSS variables in `globals.css`**
-2. **Modify the Tailwind configuration in `tailwind.config.ts`**
-3. **Update component styles as needed**
-
-## PWA Configuration
-
-The application is configured as a Progressive Web App (PWA) using the Next.js App Router. The PWA configuration is in `app/manifest.ts`.
-
-### Customizing the PWA
-
-To customize the PWA:
-
-1. **Update the manifest in `app/manifest.ts`**
-2. **Add or update icons in the `public` directory**
-3. **Configure offline support if needed**
-
-## Dependencies
-
-- **Next.js**: React framework
-- **React**: UI library
-- **Tailwind CSS**: Utility-first CSS framework
-- **shadcn/ui**: UI component library
-- **Lucide React**: Icon library
-- **next-themes**: Theme management
-- **React Markdown**: Markdown rendering
-
-## Additional Export Considerations
-
-When exporting and integrating this project into your environment, keep the following in mind:
-
-1. **Dependencies**: Make sure to install all required dependencies:
-   - next
-   - react
-   - react-dom
-   - tailwindcss
-   - postcss
-   - autoprefixer
-   - tailwindcss-animate
-   - lucide-react
-   - next-themes
-   - react-markdown
-
-2. **shadcn/ui Components**: The project uses shadcn/ui components. You'll need to install these using the shadcn CLI or copy them from the export. If you're using the shadcn CLI command for installation, these will be included automatically.
-
-3. **Fonts**: The project uses Inter and Space Grotesk fonts from Google Fonts. Make sure to include these in your project by adding them to your layout.tsx file:
-
-   \`\`\`tsx
-   import { Inter, Space_Grotesk } from 'next/font/google'
-   
-   const inter = Inter({
-     subsets: ["latin"],
-     variable: "--font-inter",
-   })
-   
-   const spaceGrotesk = Space_Grotesk({
-     subsets: ["latin"],
-     variable: "--font-space-grotesk",
-   })
-   \`\`\`
-
-4. **Icons**: The project uses Lucide React icons. Make sure to install this package and import icons correctly.
-
-5. **CSS Variables**: Ensure all CSS variables in globals.css are properly defined. These are critical for the theming system to work correctly.
-
-6. **Tailwind Configuration**: The tailwind.config.ts file includes custom theme extensions. Make sure this file is properly copied to your project.
-
-7. **Testing**: Before deploying, test the application thoroughly to ensure all components and features work as expected.
-
-8. **Browser Compatibility**: Test the application in different browsers to ensure cross-browser compatibility.
-
-9. **Mobile Responsiveness**: Verify that the application works correctly on different screen sizes and devices.
-
-10. **Performance Optimization**: Consider implementing performance optimizations like code splitting, lazy loading, and image optimization.
-
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues
 
-1. **Styling Issues**:
-   - Ensure all CSS variables are properly defined in `globals.css`
-   - Check that the Tailwind configuration includes all necessary theme extensions
+**Build Errors**
+```bash
+# Clear node_modules and reinstall
+rm -rf node_modules package-lock.json
+pnpm install
 
-2. **State Management Issues**:
-   - Check that the `AppProvider` is wrapping your application
-   - Verify that you're using the `useApp` hook correctly
+# Clear Vite cache
+pnpm run dev --force
+```
 
-3. **Component Rendering Issues**:
-   - Ensure components are properly imported
-   - Check for missing dependencies
-   - Verify that conditional rendering logic is correct
+**API Connection Issues**
+- Verify orchestrator is running on correct port
+- Check CORS settings in orchestrator
+- Ensure environment variables are set correctly
 
-4. **PWA Issues**:
-   - Ensure the manifest is properly configured
-   - Check that all required icons are available
-   - Verify that the service worker is registered correctly
+**Wallet Connection Problems**
+- Check if wallet extension is installed
+- Verify network configuration
+- Ensure proper RPC endpoints
 
-### Getting Help
+### Debug Mode
+```typescript
+// Enable debug logging
+localStorage.setItem('debug', 'true');
 
-If you encounter issues not covered in this documentation, please:
+// Or set in environment
+VITE_DEBUG_MODE=true
+```
 
-1. Check the project repository for open issues
-2. Consult the Next.js and Tailwind CSS documentation
-3. Reach out to the project maintainers
+## 🤝 Contributing
+
+We welcome contributions to improve the UI:
+
+### Development Setup
+```bash
+# Install dependencies
+pnpm install
+
+# Start development server
+pnpm run dev
+
+# Run linting
+pnpm run lint
+
+# Format code
+pnpm run format
+```
+
+### Contribution Areas
+- **Accessibility**: Improve WCAG compliance
+- **Performance**: Optimize loading and rendering
+- **Features**: Add new UI components and interactions
+- **Design**: Enhance visual design and UX
+
+## 📱 PWA Features
+
+### Installation
+- **Add to Home Screen**: Prompt users to install the app
+- **Offline Support**: Basic functionality without internet
+- **Push Notifications**: Updates about persona generation
+
+### Manifest Configuration
+```json
+{
+  "name": "INTU Persona Demo",
+  "short_name": "Persona Demo",
+  "description": "Create and interact with AI personas on blockchain",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait"
+}
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](../LICENSE) for details.
 
 ---
 
-This README provides a comprehensive guide to the INTU Persona Demo project. For more detailed information about specific components or features, please refer to the code comments and documentation within each file.
+**Part of the [INTU Persona Demo](../) ecosystem**
